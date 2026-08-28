@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MediConnect | Doctor Appointment</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+<style>
+:root{
+  --primary:#0b8fba;
+  --primary-dark:#086b8c;
+  --navy:#12324a;
+  --text:#243746;
+  --muted:#6b7c89;
+  --border:#dbe5eb;
+  --bg:#f4f9fb;
+  --success:#20a464;
+  --danger:#df4b4b;
+  --selected:#0b8fba;
+  --available:#94a3ad;
+  --booked:#4caf70;
+}
+*{box-sizing:border-box}
+body{
+  margin:0; min-height:100vh; padding:28px 16px;
+  font-family:Inter,Arial,sans-serif; color:var(--text);
+  background:linear-gradient(135deg,#eef9fc 0%,#fff 48%,#eaf5fa 100%);
+}
+body:before{
+  content:""; position:fixed; inset:0; pointer-events:none;
+  background-image:linear-gradient(rgba(11,143,186,.035) 1px,transparent 1px),
+                   linear-gradient(90deg,rgba(11,143,186,.035) 1px,transparent 1px);
+  background-size:40px 40px;
+}
+.container{width:min(100%,760px);margin:auto;position:relative}
+.header{text-align:center;margin:5px 0 24px}
+.logo{
+  width:62px;height:62px;margin:0 auto 10px;border-radius:18px;
+  display:grid;place-items:center;background:#e1f5fb;color:var(--primary);
+  font-size:28px;box-shadow:0 10px 25px rgba(11,143,186,.12)
+}
+.header h1{margin:0;color:var(--navy);font-size:34px;font-weight:800;letter-spacing:-.8px}
+.header p{margin:6px 0 0;color:var(--primary-dark);font-size:11px;font-weight:800;letter-spacing:2px}
+
+.card{
+  background:rgba(255,255,255,.97);border:1px solid rgba(219,229,235,.9);
+  border-radius:24px;padding:30px;box-shadow:0 18px 55px rgba(30,64,80,.10)
+}
+.progress{display:grid;grid-template-columns:repeat(5,1fr);gap:7px;margin-bottom:28px}
+.progress span{height:5px;border-radius:99px;background:#e7eef2;transition:.25s}
+.progress span.active{background:var(--primary)}
+
+.step{
+  display:flex;align-items:center;gap:9px;margin:20px 0 9px;
+  font-size:12px;font-weight:800;letter-spacing:.7px;text-transform:uppercase;color:var(--navy)
+}
+.step:first-of-type{margin-top:0}
+.step i{color:var(--primary);width:18px;text-align:center}
+.field-wrap{position:relative}
+select,input{
+  width:100%;height:50px;padding:0 15px;border:1px solid var(--border);
+  border-radius:12px;background:#fbfdfe;color:var(--text);font:600 14px Inter,Arial,sans-serif;
+  transition:.2s
+}
+select{cursor:pointer}
+select:disabled{cursor:not-allowed;color:#9aa8b1;background:#f3f6f8}
+select:focus,input:focus{outline:0;border-color:var(--primary);box-shadow:0 0 0 4px rgba(11,143,186,.10);background:#fff}
+
+.helper{font-size:11px;color:var(--muted);margin:7px 2px 0}
+.message{display:none;margin-top:12px;padding:12px 14px;border-radius:11px;font-size:12px;font-weight:700}
+.message.error{background:#fff1f1;color:#b53c3c;border:1px solid #ffd1d1}
+.message.info{background:#eef9fc;color:#086b8c;border:1px solid #c8edf6}
+
+#slotArea,#seatArea,#paymentArea{display:none}
+.slot-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.slot{
+  min-height:52px;border:1px solid var(--border);border-radius:12px;background:#fff;
+  color:var(--text);font-size:12px;font-weight:700;cursor:pointer;transition:.2s
+}
+.slot:hover{border-color:var(--primary);transform:translateY(-1px)}
+.slot.selected{background:var(--primary);border-color:var(--primary);color:#fff;box-shadow:0 7px 18px rgba(11,143,186,.22)}
+
+#seatArea{
+  margin-top:24px;padding:20px;border:1px solid var(--border);
+  border-radius:18px;background:#f8fbfc
+}
+.seat-top{display:flex;justify-content:space-between;gap:15px;margin-bottom:17px;font-size:12px;font-weight:800}
+#seatCount{color:var(--primary-dark)}
+.seat-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px}
+.seat{
+  height:46px;border:0;border-radius:10px;color:#fff;font-size:11px;font-weight:800;
+  display:grid;place-items:center;transition:.18s
+}
+.seat.available{background:var(--available);cursor:pointer}
+.seat.available:hover{background:#71808a;transform:translateY(-1px)}
+.seat.selected{background:var(--selected);cursor:pointer;box-shadow:0 6px 15px rgba(11,143,186,.25)}
+.seat.booked{background:var(--booked);cursor:not-allowed}
+.legend{display:flex;justify-content:center;flex-wrap:wrap;gap:14px;margin-top:17px}
+.legend-item{display:flex;align-items:center;gap:6px;font-size:10px;font-weight:700;color:#62727d}
+.legend-color{width:11px;height:11px;border-radius:3px}
+.grey{background:var(--available)} .blue{background:var(--selected)} .green{background:var(--booked)}
+#vacancyMessage{text-align:center;margin:14px 0 0;font-size:11px;color:var(--muted);font-weight:600}
+
+#paymentArea{
+  margin-top:24px;padding:22px;border-radius:18px;background:#f2fbfe;
+  border:1px solid #c8edf6;text-align:center
+}
+#paymentArea h3{margin:0 0 6px;color:var(--navy);font-size:18px}
+.gpay-badge{display:flex;align-items:center;justify-content:center;gap:9px;width:max-content;margin:4px auto 16px;padding:9px 18px;border:1px solid #dce6ea;border-radius:999px;background:#fff;color:#3c4043;font-size:14px;box-shadow:0 5px 18px rgba(0,0,0,.07)}
+.gpay-badge strong{font-size:15px}
+
+.gpay-g{font-size:18px;font-weight:800;background:linear-gradient(90deg,#4285f4 0 25%,#34a853 25% 50%,#fbbc05 50% 75%,#ea4335 75%);-webkit-background-clip:text;background-clip:text;color:transparent}
+.upi-note{font-size:9px;font-weight:800;color:#75838c;padding-left:4px;border-left:1px solid #dce3e7}
+
+
+.booking-info{
+  display:grid;grid-template-columns:1fr 1fr;gap:9px;text-align:left;
+  background:#fff;border:1px solid #e5edf1;padding:15px;border-radius:13px;
+  font-size:11px;line-height:1.55;margin-bottom:18px
+}
+.booking-info div{padding:6px 8px;background:#f8fafb;border-radius:8px}
+.booking-info strong{display:block;color:#82919b;font-size:9px;text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px}
+#qrCode{display:flex;justify-content:center;align-items:center;min-height:190px}
+#qrCode img{padding:8px;background:#fff;border-radius:10px;border:1px solid #e4ebee}
+.amount{display:none}
+.payment-note{font-size:10px;color:#74838c;margin:2px 0 10px}
+.payment-status{margin:12px 0;padding:11px;border-radius:10px;font-size:11px;font-weight:800}
+.status-waiting{background:#fff6dc;color:#986d0b}
+.status-verified{background:#e4f8ed;color:#167348}
+button{
+  width:100%;height:48px;border:0;border-radius:12px;margin-top:9px;
+  font:800 13px Inter,Arial,sans-serif;cursor:pointer;transition:.2s
+}
+button:hover:not(:disabled){transform:translateY(-1px)}
+button:disabled{cursor:not-allowed;opacity:.55}
+.check-btn,.confirm-btn{background:var(--primary);color:#fff}
+.demo-btn{background:#6f4acb;color:#fff}
+.reset-btn{background:#eef2f4;color:#62727d}
+.footer{text-align:center;margin-top:17px;color:#84929b;font-size:10px}
+.hidden{display:none!important}
+
+@media(max-width:600px){
+  body{padding:18px 10px}
+  .card{padding:21px;border-radius:20px}
+  .header h1{font-size:29px}
+  .slot-grid{grid-template-columns:repeat(2,1fr)}
+  .seat-grid{gap:7px}
+  .seat{height:40px;font-size:10px}
+  .booking-info{grid-template-columns:1fr}
+}
+</style>
+</head>
+
+<body>
+<div class="container">
+  <header class="header">
+    <div class="logo"><i class="fa-solid fa-heart-pulse"></i></div>
+    <h1>MediConnect</h1>
+    <p>SMART DOCTOR APPOINTMENT BOOKING</p>
+  </header>
+
+  <main class="card">
+    <div class="progress" aria-label="Booking progress">
+      <span id="p1" class="active"></span><span id="p2"></span><span id="p3"></span>
+      <span id="p4"></span><span id="p5"></span>
+    </div>
+
+    <div class="step"><i class="fa-solid fa-stethoscope"></i>1. Medical Specialty</div>
+    <select id="specialtySelect" onchange="filterDoctors()">
+      <option value="">Select a medical specialty</option>
+      <option value="ENT">ENT (Ear, Nose & Throat)</option>
+      <option value="CARDIOLOGY">Cardiology</option>
+      <option value="NEUROSURGEON">Neurosurgery</option>
+    </select>
+
+    <div class="step"><i class="fa-solid fa-user-doctor"></i>2. Select Doctor</div>
+    <select id="doctorSelect" onchange="doctorChanged()" disabled>
+      <option value="">Select specialty first</option>
+    </select>
+    <div class="helper" id="doctorHelper">Choose a specialty to view available doctors.</div>
+
+    <div class="step"><i class="fa-solid fa-calendar-days"></i>3. Appointment Date</div>
+    <input type="date" id="dateInput" onchange="dateChanged()" disabled>
+    <div id="unavailableMsg" class="message error">
+      <i class="fa-solid fa-circle-info"></i> Doctors are unavailable on Sundays. Please choose another date.
+    </div>
+
+    <div id="slotArea">
+      <div class="step"><i class="fa-solid fa-clock"></i>4. Appointment Time</div>
+      <div id="slots" class="slot-grid"></div>
+    </div>
+
+    <div id="seatArea">
+      <div class="seat-top">
+        <span><i class="fa-solid fa-chair"></i> 5. Seat Availability</span>
+        <span id="seatCount">10 / 10 Available</span>
+      </div>
+      <div id="seatGrid" class="seat-grid"></div>
+      <div class="legend">
+        <div class="legend-item"><span class="legend-color grey"></span>Available</div>
+        <div class="legend-item"><span class="legend-color blue"></span>Selected</div>
+        <div class="legend-item"><span class="legend-color green"></span>Booked</div>
+      </div>
+      <div id="vacancyMessage">Select an available seat to continue.</div>
+      <button id="paymentBtn" class="check-btn" onclick="showPayment()" disabled>
+        <i class="fa-solid fa-arrow-right"></i> Continue to Payment
+      </button>
+    </div>
+
+    <div id="paymentArea">
+      <h3>Appointment Payment</h3>
+      <div class="gpay-badge"><span class="gpay-g">G</span><strong>Google Pay</strong><span class="upi-note">UPI</span></div>
+      <div id="bookingInfo" class="booking-info"></div>
+      <div class="amount" id="amountDisplay"></div>
+      <div id="qrCode"></div>
+      <div class="payment-note">After completing the payment, your payment gateway/backend will verify it automatically.</div>
+      <div id="paymentStatus" class="payment-status status-waiting">
+        <i class="fa-solid fa-qrcode"></i> Scan the QR and complete payment in Google Pay
+      </div>
+      <button id="verifyBtn" class="demo-btn" onclick="verifyPayment()" disabled>
+        <i class="fa-solid fa-shield-check"></i> Verify Payment
+      </button>
+      <button id="confirmBtn" class="confirm-btn" onclick="confirmBooking()" disabled>
+        <i class="fa-solid fa-calendar-check"></i> Confirm Appointment
+      </button>
+    </div>
+
+    <button class="reset-btn" onclick="resetBooking()">
+      <i class="fa-solid fa-rotate-left"></i> Start New Booking
+    </button>
+  </main>
+
+  <div class="footer">© 2026 MediConnect · Secure & convenient appointment booking</div>
+</div>
+
+<script>
+/* Doctor data — replace/extend this object with your database/API data later. */
+const doctors = {
+  ENT: [
+    {id:"ent01", name:"Dr. Arun Kumar", qualification:"MBBS, MS (ENT)",
+      hospital:{name:"MediCare Hospital", paymentAmount:500, upiId:"medicare@upi"}},
+    {id:"ent02", name:"Dr. Priya Sharma", qualification:"MBBS, DLO",
+      hospital:{name:"MediCare Hospital", paymentAmount:450, upiId:"medicare@upi"}},
+    {id:"ent03", name:"Dr. Karthik Raj", qualification:"MBBS, MS (ENT)",
+      hospital:{name:"City Health Hospital", paymentAmount:600, upiId:"cityhealth@upi"}}
+  ],
+  CARDIOLOGY: [
+    {id:"card01", name:"Dr. Suresh Kumar", qualification:"MBBS, MD, DM (Cardiology)",
+      hospital:{name:"HeartCare Hospital", paymentAmount:800, upiId:"heartcare@upi"}},
+    {id:"card02", name:"Dr. Meena Ravi", qualification:"MBBS, MD, DNB",
+      hospital:{name:"HeartCare Hospital", paymentAmount:750, upiId:"heartcare@upi"}},
+    {id:"card03", name:"Dr. Naveen Prakash", qualification:"MBBS, DM (Cardiology)",
+      hospital:{name:"City Health Hospital", paymentAmount:900, upiId:"cityhealth@upi"}}
+  ],
+  NEUROSURGEON: [
+    {id:"neuro01", name:"Dr. Vignesh Anand", qualification:"MBBS, MS, MCh (Neuro)",
+      hospital:{name:"NeuroCare Hospital", paymentAmount:1200, upiId:"neurocare@upi"}},
+    {id:"neuro02", name:"Dr. Divya Menon", qualification:"MBBS, MS, MCh",
+      hospital:{name:"NeuroCare Hospital", paymentAmount:1100, upiId:"neurocare@upi"}},
+    {id:"neuro03", name:"Dr. Rahul Dev", qualification:"MBBS, MCh (Neurosurgery)",
+      hospital:{name:"City Health Hospital", paymentAmount:1000, upiId:"cityhealth@upi"}}
+  ]
+};
+
+const slots = ["09:00 AM","10:00 AM","11:00 AM","02:00 PM","03:00 PM","04:00 PM"];
+let state = { specialty:"", doctor:null, date:"", time:"", seat:null, payment:false };
+const TOTAL_SEATS = 10;
+// IMPORTANT: No global/default consultation fee.
+// Each hospital declares its own fee in the hospital configuration/backend.
+function getHospitalFee(){
+  return Number(state.doctor?.hospital?.paymentAmount || 0);
+}
+
+const $ = id => document.getElementById(id);
+
+function updateProgress(step){
+  for(let i=1;i<=5;i++) $("p"+i).classList.toggle("active", i<=step);
+}
+
+function filterDoctors(){
+  const specialty = $("specialtySelect").value;
+  state = {specialty, doctor:null, date:"", time:"", seat:null, payment:false};
+
+  $("doctorSelect").innerHTML = "";
+  $("slotArea").style.display = "none";
+  $("seatArea").style.display = "none";
+  $("paymentArea").style.display = "none";
+  $("unavailableMsg").style.display = "none";
+  $("dateInput").value = "";
+  $("dateInput").disabled = !specialty;
+  $("paymentBtn").disabled = true;
+
+  if(!specialty){
+    $("doctorSelect").disabled = true;
+    $("doctorSelect").innerHTML = '<option value="">Select specialty first</option>';
+    $("doctorHelper").textContent = "Choose a specialty to view available doctors.";
+    updateProgress(1);
+    return;
+  }
+
+  $("doctorSelect").disabled = false;
+  $("doctorSelect").innerHTML =
+    '<option value="">Select a doctor</option>' +
+    doctors[specialty].map(d =>
+      `<option value="${d.id}">${d.name} — ${d.qualification}</option>`
+    ).join("");
+  $("doctorHelper").textContent = `${doctors[specialty].length} doctors available for this specialty.`;
+  updateProgress(2);
+}
+
+function doctorChanged(){
+  const id = $("doctorSelect").value;
+  state.doctor = doctors[state.specialty]?.find(d => d.id === id) || null;
+  state.date = ""; state.time = ""; state.seat = null;
+  $("slotArea").style.display = "none";
+  $("seatArea").style.display = "none";
+  $("paymentArea").style.display = "none";
+  $("unavailableMsg").style.display = "none";
+  $("dateInput").value = "";
+  updateProgress(state.doctor ? 3 : 2);
+}
+
+function dateChanged(){
+  const date = $("dateInput").value;
+  state.date = date; state.time = ""; state.seat = null;
+  $("seatArea").style.display = "none";
+  $("paymentArea").style.display = "none";
+  $("unavailableMsg").style.display = "none";
+
+  if(!date || !state.doctor) return;
+
+  const day = new Date(date + "T00:00:00").getDay();
+  if(day === 0){
+    $("unavailableMsg").style.display = "block";
+    $("slotArea").style.display = "none";
+    updateProgress(3);
+    return;
+  }
+
+  renderSlots();
+  $("slotArea").style.display = "block";
+  updateProgress(4);
+}
+
+function renderSlots(){
+  const now = new Date();
+  const isToday = state.date === getTodayLocalDate();
+
+  $("slots").innerHTML = slots.map(time => {
+    const expired = isToday && timeToMinutes(time) <= now.getHours()*60 + now.getMinutes();
+    if(expired){
+      return `<button type="button" class="slot" disabled title="This time has already ended">
+        <i class="fa-solid fa-clock"></i> ${time}<br><small>Booking closed</small>
+      </button>`;
+    }
+    return `<button type="button" class="slot" onclick="selectTime('${time}')">${time}</button>`;
+  }).join("");
+
+  if(isToday && slots.every(time => timeToMinutes(time) <= now.getHours()*60 + now.getMinutes())){
+    $("slots").innerHTML = '<div class="message error" style="display:block;grid-column:1/-1">All appointment times for today have ended. Booking is unavailable for today.</div>';
+    $("seatArea").style.display = "none";
+  }
+}
+
+function timeToMinutes(time){
+  const [hm,ampm] = time.split(" ");
+  let [h,m] = hm.split(":").map(Number);
+  if(ampm === "PM" && h !== 12) h += 12;
+  if(ampm === "AM" && h === 12) h = 0;
+  return h*60+m;
+}
+
+function getTodayLocalDate(){
+  const d = new Date();
+  return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().split("T")[0];
+}
+
+function selectTime(time){
+  if(state.date === getTodayLocalDate()){
+    const now = new Date();
+    if(timeToMinutes(time) <= now.getHours()*60 + now.getMinutes()){
+      $("vacancyMessage").textContent = "This appointment time has ended. Booking is unavailable.";
+      $("seatArea").style.display = "none";
+      return;
+    }
+  }
+  state.time = time; state.seat = null;
+  document.querySelectorAll(".slot").forEach(b => b.classList.toggle("selected", b.textContent === time));
+  renderSeats();
+  $("seatArea").style.display = "block";
+  $("paymentArea").style.display = "none";
+  updateProgress(5);
+}
+
+function getBookedSeats(){
+  /* Demo booking pattern. Replace with backend availability for real project. */
+  const seed = (state.doctor.id + state.date + state.time).split("")
+    .reduce((a,c)=>a+c.charCodeAt(0),0);
+  const booked = [];
+  for(let i=1;i<=TOTAL_SEATS;i++){
+    if((seed + i * 7) % 5 === 0) booked.push(i);
+  }
+  return booked;
+}
+
+function renderSeats(){
+  const booked = getBookedSeats();
+  state.seat = null;
+  $("seatGrid").innerHTML = "";
+  for(let i=1;i<=TOTAL_SEATS;i++){
+    const el = document.createElement("button");
+    el.type = "button";
+    el.className = "seat " + (booked.includes(i) ? "booked" : "available");
+    el.textContent = "Seat " + i;
+    el.disabled = booked.includes(i);
+    if(!el.disabled) el.onclick = () => selectSeat(i);
+    $("seatGrid").appendChild(el);
+  }
+  updateSeatCount(booked.length);
+}
+
+function selectSeat(number){
+  state.seat = number;
+  document.querySelectorAll(".seat.available").forEach(el => el.classList.remove("selected"));
+  [...document.querySelectorAll(".seat.available")].find(el => el.textContent === "Seat " + number)?.classList.add("selected");
+  $("vacancyMessage").textContent = `Seat ${number} selected. Continue to payment.`;
+  $("paymentBtn").disabled = false;
+}
+
+function updateSeatCount(bookedCount){
+  $("seatCount").textContent = `${TOTAL_SEATS-bookedCount} / ${TOTAL_SEATS} Available`;
+}
+
+function showPayment(){
+  if(!state.doctor || !state.date || !state.time || !state.seat) return;
+
+  const fee = getHospitalFee();
+  const hospital = state.doctor.hospital;
+
+  if(!fee || !hospital?.upiId){
+    $("paymentArea").style.display = "block";
+    $("bookingInfo").innerHTML = `
+      <div><strong>Doctor</strong>${state.doctor.name}</div>
+      <div><strong>Hospital</strong>${hospital?.name || "Hospital"}</div>
+      <div><strong>Specialty</strong>${specialtyLabel(state.specialty)}</div>
+      <div><strong>Status</strong>Payment not configured</div>
+    `;
+    $("amountDisplay").textContent = "Fee not configured";
+    $("qrCode").innerHTML = '<div class="message error" style="display:block">Payment QR is currently unavailable. Please try again later.</div>';
+    $("paymentStatus").className = "payment-status status-waiting";
+    $("paymentStatus").innerHTML = '<i class="fa-solid fa-circle-info"></i> Payment QR is currently unavailable.';
+    $("confirmBtn").disabled = true;
+    return;
+  }
+
+  $("bookingInfo").innerHTML = `
+    <div><strong>Doctor</strong>${state.doctor.name}</div>
+    <div><strong>Specialty</strong>${specialtyLabel(state.specialty)}</div>
+    <div><strong>Date</strong>${formatDate(state.date)}</div>
+    <div><strong>Time</strong>${state.time}</div>
+    <div><strong>Seat</strong>Seat ${state.seat}</div>
+  `;
+  $("amountDisplay").textContent = "";
+  $("paymentArea").style.display = "block";
+  $("paymentStatus").className = "payment-status status-waiting";
+  $("paymentStatus").innerHTML = '<i class="fa-solid fa-qrcode"></i> Scan the QR and complete payment in Google Pay';
+  $("confirmBtn").disabled = true;
+  $("verifyBtn").disabled = true;
+  state.payment = false;
+
+  const qr = $("qrCode");
+  qr.innerHTML = "";
+  if(typeof QRCode !== "undefined"){
+    new QRCode(qr,{
+      text:`upi://pay?pa=${encodeURIComponent(hospital.upiId)}&pn=${encodeURIComponent(hospital.name)}&am=${fee}&cu=INR`,
+      width:180,height:180
+    });
+  }else{
+    qr.innerHTML = '<div class="message info" style="display:block">QR library could not be loaded. Please check your internet connection.</div>';
+  }
+  $("verifyBtn").disabled = false;
+  $("paymentArea").scrollIntoView({behavior:"smooth",block:"center"});
+}
+
+function verifyPayment(){
+  /*
+    IMPORTANT:
+    A frontend button cannot know whether the user actually paid in Google Pay.
+    Real verification must come from the payment provider/backend webhook.
+    Therefore this button must NOT mark the payment as successful by itself.
+  */
+  state.payment = false;
+  $("paymentStatus").className = "payment-status status-waiting";
+  $("paymentStatus").innerHTML =
+    '<i class="fa-solid fa-clock"></i> Payment not verified yet. Complete the GPay payment first.';
+  $("confirmBtn").disabled = true;
+}
+
+function confirmBooking(){
+  if(!state.payment) return;
+  $("paymentStatus").className = "payment-status status-verified";
+  $("paymentStatus").innerHTML = '<i class="fa-solid fa-circle-check"></i> Appointment confirmed successfully!';
+  $("confirmBtn").disabled = true;
+  $("vacancyMessage").textContent = `Booking confirmed for ${state.doctor.name} — Seat ${state.seat}.`;
+}
+
+function specialtyLabel(key){
+  return {ENT:"ENT",CARDIOLOGY:"Cardiology",NEUROSURGEON:"Neurosurgery"}[key] || key;
+}
+
+function formatDate(value){
+  return new Date(value+"T00:00:00").toLocaleDateString("en-IN",{day:"2-digit",month:"short",year:"numeric"});
+}
+
+function resetBooking(){
+  location.reload();
+}
+
+/* Prevent past dates */
+(function(){
+  const now = new Date();
+  const local = new Date(now.getTime() - now.getTimezoneOffset()*60000).toISOString().split("T")[0];
+  $("dateInput").min = local;
+})();
+</script>
+</body>
+</html>
+
+<script>
+setInterval(() => {
+  if(state.doctor && state.date === getTodayLocalDate() && state.time === ""){
+    renderSlots();
+  }
+}, 30000);
+</script>
