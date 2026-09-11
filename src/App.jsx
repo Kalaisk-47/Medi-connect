@@ -193,10 +193,14 @@ function App() {
   return (
     <>
       <header className="navbar">
-        <a href="#" className="brand">
+        <a href="#top" className="brand">
           <div className="brand-icon">+</div>
           MediConnect
         </a>
+        <nav className="nav-links" aria-label="Primary navigation">
+          <a href="#services">Why MediConnect</a>
+          <a href="#booking">Book a visit</a>
+        </nav>
         <div className="nav-actions">
           <div id="userProfile" className="user-pill" style={{ display: currentUser ? 'inline-flex' : 'none' }}>
             <span>👤</span>
@@ -213,10 +217,42 @@ function App() {
         </div>
       </header>
 
-      <div className="container">
-        <div className="hero">
-          <h1>Smart OPD &amp; Token System</h1>
-          <p>LIVE QUEUE STATUS · REAL SPECIALISTS · COIMBATORE</p>
+      <main id="top">
+        <section className="landing-hero">
+          <div className="landing-copy">
+            <div className="eyebrow"><span className="eyebrow-dot" /> Healthcare, made easier</div>
+            <h1>Better care starts with a <em>simpler visit.</em></h1>
+            <p className="landing-lede">Find trusted specialists, choose a convenient OPD slot, and reserve your token before you arrive.</p>
+            <div className="landing-actions">
+              <a className="landing-cta" href="#booking">Book an appointment <span aria-hidden="true">↗</span></a>
+              <a className="landing-secondary" href="#services">Explore the experience <span aria-hidden="true">↓</span></a>
+            </div>
+            <div className="landing-proof">
+              <div className="proof-avatars" aria-hidden="true"><span>PN</span><span>RM</span><span>SK</span></div>
+              <p><strong>Trusted by patients across Coimbatore</strong><br /><span>Real specialists · Live OPD availability</span></p>
+            </div>
+          </div>
+          <div className="landing-art" aria-label="MediConnect appointment illustration">
+            <div className="art-glow" />
+            <div className="art-card art-card-top"><span className="art-icon">✓</span><div><strong>Appointment confirmed</strong><small>Today, 10:00 AM</small></div></div>
+            <div className="art-card art-card-bottom"><span className="pulse-dot" /><div><strong>Live token updates</strong><small>Know before you go</small></div></div>
+          </div>
+        </section>
+
+        <section className="service-strip" id="services" aria-label="MediConnect benefits">
+          <div className="service-item"><span className="service-icon">01</span><div><strong>Choose with confidence</strong><p>Qualified specialists at leading hospitals.</p></div></div>
+          <div className="service-item"><span className="service-icon">02</span><div><strong>Skip the uncertainty</strong><p>See available slots and live token status.</p></div></div>
+          <div className="service-item"><span className="service-icon">03</span><div><strong>Arrive prepared</strong><p>Reserve your visit in a few simple steps.</p></div></div>
+        </section>
+      </main>
+
+      <div className="container" id="booking">
+        <div className="booking-intro">
+          <div>
+            <p className="booking-kicker">Your care, your time</p>
+            <h2>Reserve your OPD token</h2>
+            <p>Select a specialty and doctor to see the next available visit.</p>
+          </div>
           <div className="location-bar">
             📍 <span id="locationText">Coimbatore, Tamil Nadu</span>
           </div>
