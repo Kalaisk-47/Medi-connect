@@ -52,6 +52,10 @@ function App() {
   const [specialty, setSpecialty] = useState('')
   const [doctorId, setDoctorId] = useState('')
   const [patientType, setPatientType] = useState('Myself')
+  const [patientName, setPatientName] = useState(() => {
+    const saved = localStorage.getItem('mediconnect_user')
+    return saved ? JSON.parse(saved).name : ''
+  })
   const [patientAge, setPatientAge] = useState('26')
   const [date, setDate] = useState('')
   const [time, setTime] = useState('')
@@ -144,6 +148,7 @@ function App() {
     const nextUser = { name: identifier.split('@')[0] || 'Patient', email: identifier }
     localStorage.setItem('mediconnect_user', JSON.stringify(nextUser))
     setCurrentUser(nextUser)
+    setPatientName(nextUser.name)
     setIsAuthOpen(false)
     setLoginInput('')
   }
@@ -172,6 +177,7 @@ function App() {
     setSpecialty('')
     setDoctorId('')
     setPatientType('Myself')
+    setPatientName(currentUser?.name || '')
     setPatientAge('26')
     setDate('')
     setTime('')
@@ -186,9 +192,7 @@ function App() {
   const doctorList = specialty ? doctors[specialty] : []
   const dayOfWeek = date ? new Date(`${date}T00:00:00`).getDay() : null
   const isToday = date === getLocalDateString()
-  const qrUrl = selectedDoctor
-    ? `https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(`upi://pay?pa=${encodeURIComponent(selectedDoctor.hospital.upiId)}&pn=${encodeURIComponent(selectedDoctor.hospital.name)}&cu=INR`)}`
-    : ''
+  const qrImage = '/payment-qr.svg'
 
   return (
     <>
@@ -286,14 +290,33 @@ function App() {
 
           <div className="step-title">1. Patient Profile</div>
           <div className="family-row">
-            <select value={patientType} onChange={(e) => setPatientType(e.target.value)}>
-              <option value="Myself">Patient: Myself</option>
-              <option value="Father">Patient: Father</option>
-              <option value="Mother">Patient: Mother</option>
-              <option value="Spouse">Patient: Spouse</option>
-              <option value="Child">Patient: Child</option>
+            <select value={patientType} onChange={(e) => setPatientType(e.target.value)} aria-label="Who is booking for">
+              <option value="Myself">Whom is booking for? Myself</option>
+              <option value="Father">Whom is booking for? Father</option>
+              <option value="Mother">Whom is booking for? Mother</option>
+              <option value="Spouse">Whom is booking for? Spouse</option>
+              <option value="Child">Whom is booking for? Child</option>
             </select>
-            <input type="number" id="patientAge" placeholder="Age" min="1" max="110" value={patientAge} onChange={(e) => setPatientAge(e.target.value)} />
+          </div>
+          <div className="family-row" style={{ marginTop: '12px' }}>
+            <input
+              type="text"
+              id="patientName"
+              placeholder="Patient Name"
+              value={patientName}
+              onChange={(e) => setPatientName(e.target.value)}
+              aria-label="Patient Name"
+            />
+            <input
+              type="number"
+              id="patientAge"
+              placeholder="Age"
+              min="1"
+              max="110"
+              value={patientAge}
+              onChange={(e) => setPatientAge(e.target.value)}
+              aria-label="Patient Age"
+            />
           </div>
 
           <div className="step-title">2. Medical Specialty</div>
@@ -406,7 +429,7 @@ function App() {
             <div id="paymentArea" style={{ display: 'block' }}>
               <div className="gpay-badge">💳 Google Pay / PhonePe UPI</div>
               <div id="bookingSummary" className="booking-summary">
-                <div className="summary-item"><strong>Patient Profile</strong>{patientType} ({patientAge} Yrs)</div>
+                <div className="summary-item"><strong>Patient Profile</strong>{patientName || patientType} ({patientAge} Yrs)</div>
                 <div className="summary-item"><strong>Doctor</strong>{selectedDoctor.name}</div>
                 <div className="summary-item"><strong>Hospital</strong>{selectedDoctor.hospital.name}</div>
                 <div className="summary-item"><strong>Date &amp; Slot</strong>{date} · {time}</div>
@@ -414,7 +437,7 @@ function App() {
                 <div className="summary-item"><strong>OPD Status</strong>On Schedule</div>
               </div>
               <div id="qrContainer">
-                <img src={qrUrl} alt="UPI QR" style={{ borderRadius: '8px', width: '160px', height: '160px' }} />
+                <img src={qrImage} alt="UPI QR" style={{ borderRadius: '8px', width: '160px', height: '160px' }} />
               </div>
               <div style={{ fontSize: '11px', color: 'var(--muted)', marginBottom: '12px' }}>
                 Scan the QR with any UPI app and complete the token reservation.
