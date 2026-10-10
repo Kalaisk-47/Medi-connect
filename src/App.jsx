@@ -24,6 +24,14 @@ const doctors = {
 
 const slots = ['09:00 AM', '10:00 AM', '11:00 AM', '02:00 PM', '03:00 PM', '04:00 PM']
 const TOTAL_SEATS = 10
+const ADMIN_CREDENTIALS = { email: 'admin@mediconnect.com', password: 'Admin@123' }
+const readAppointments = () => {
+  try {
+    return JSON.parse(localStorage.getItem('mediconnect_appointments') || '[]')
+  } catch {
+    return []
+  }
+}
 
 const getLocalDateString = () => {
   const today = new Date()
@@ -61,10 +69,17 @@ function App() {
   const [time, setTime] = useState('')
   const [seat, setSeat] = useState(null)
   const [showPayment, setShowPayment] = useState(false)
+  const [paymentMethod, setPaymentMethod] = useState('')
   const [utr, setUtr] = useState('')
   const [paymentVerified, setPaymentVerified] = useState(false)
+  const [currentPage, setCurrentPage] = useState('home')
   const [isAuthOpen, setIsAuthOpen] = useState(false)
   const [loginInput, setLoginInput] = useState('')
+  const [appointments, setAppointments] = useState(readAppointments)
+  const [adminUser, setAdminUser] = useState(() => localStorage.getItem('mediconnect_admin') === 'true')
+  const [adminEmail, setAdminEmail] = useState('')
+  const [adminPassword, setAdminPassword] = useState('')
+  const [adminLoginError, setAdminLoginError] = useState('')
   const [currentUser, setCurrentUser] = useState(() => {
     const saved = localStorage.getItem('mediconnect_user')
     return saved ? JSON.parse(saved) : null
@@ -83,10 +98,14 @@ function App() {
 
   const bookedSeats = useMemo(() => {
     if (!selectedDoctor || !date || !time) return []
-    return getDeterministicBookedSeats(selectedDoctor.id, date, time)
-  }, [selectedDoctor, date, time])
+    const storedSeats = appointments
+      .filter((appointment) => appointment.doctorId === selectedDoctor.id && appointment.date === date && appointment.time === time)
+      .map((appointment) => appointment.seat)
+    return [...new Set([...getDeterministicBookedSeats(selectedDoctor.id, date, time), ...storedSeats])]
+  }, [selectedDoctor, date, time, appointments])
 
   const availableSeatCount = TOTAL_SEATS - bookedSeats.length
+  const canSubmitAppointment = paymentMethod === 'hospital' || (paymentMethod === 'online' && paymentVerified)
 
   const handleSymptomMatch = (specKey) => {
     setSpecialty(specKey)
@@ -95,6 +114,7 @@ function App() {
     setTime('')
     setSeat(null)
     setShowPayment(false)
+    setPaymentMethod('')
     setUtr('')
     setPaymentVerified(false)
   }
@@ -106,6 +126,7 @@ function App() {
     setTime('')
     setSeat(null)
     setShowPayment(false)
+    setPaymentMethod('')
     setUtr('')
     setPaymentVerified(false)
   }
@@ -116,6 +137,7 @@ function App() {
     setTime('')
     setSeat(null)
     setShowPayment(false)
+    setPaymentMethod('')
     setUtr('')
     setPaymentVerified(false)
   }
@@ -124,6 +146,7 @@ function App() {
     setTime(slot)
     setSeat(null)
     setShowPayment(false)
+    setPaymentMethod('')
     setUtr('')
     setPaymentVerified(false)
   }
@@ -138,6 +161,7 @@ function App() {
   const handleShowPayment = () => {
     if (!selectedDoctor || !date || !time || seat === null) return
     setShowPayment(true)
+    setPaymentMethod('')
     setPaymentVerified(false)
     setUtr('')
   }
@@ -168,9 +192,51 @@ function App() {
   }
 
   const handleConfirmBooking = () => {
-    if (!paymentVerified) return
+    if (!canSubmitAppointment) return
+    const appointment = {
+      id: `${selectedDoctor.id}-${date}-${time}-${seat}-${appointments.length + 1}`,
+      patientName: patientName.trim() || patientType,
+      patientAge,
+      patientType,
+      patientEmail: currentUser?.email || '',
+      specialty,
+      doctorId: selectedDoctor.id,
+      doctorName: selectedDoctor.name,
+      hospital: selectedDoctor.hospital.name,
+      hospitalLocation: selectedDoctor.hospital.location,
+      date,
+      time,
+      seat,
+      paymentMethod: paymentMethod === 'online' ? 'Online UPI' : 'Pay at hospital',
+      paymentStatus: paymentMethod === 'online' ? 'UTR format checked (demo)' : 'Due at hospital',
+      paymentReference: paymentMethod === 'online' ? utr.trim() : '',
+      createdAt: new Date().toISOString()
+    }
+    const nextAppointments = [...appointments, appointment]
+    localStorage.setItem('mediconnect_appointments', JSON.stringify(nextAppointments))
+    setAppointments(nextAppointments)
     alert(`🎉 Token #${seat} Confirmed!\n\nPatient: ${patientType}\nDoctor: ${selectedDoctor.name}\nHospital: ${selectedDoctor.hospital.name}\nDate: ${date} at ${time}\n\nSMS alert sent to your registered mobile.`)
     resetForm()
+  }
+
+  const handleAdminLogin = (event) => {
+    event.preventDefault()
+    if (adminEmail.trim().toLowerCase() !== ADMIN_CREDENTIALS.email || adminPassword !== ADMIN_CREDENTIALS.password) {
+      setAdminLoginError('The email or password is incorrect.')
+      return
+    }
+    localStorage.setItem('mediconnect_admin', 'true')
+    setAdminUser(true)
+    setAdminLoginError('')
+    setAdminEmail('')
+    setAdminPassword('')
+    setCurrentPage('admin-dashboard')
+  }
+
+  const handleAdminLogout = () => {
+    localStorage.removeItem('mediconnect_admin')
+    setAdminUser(false)
+    setCurrentPage('home')
   }
 
   const resetForm = () => {
@@ -183,6 +249,7 @@ function App() {
     setTime('')
     setSeat(null)
     setShowPayment(false)
+    setPaymentMethod('')
     setUtr('')
     setPaymentVerified(false)
     setIsAuthOpen(false)
@@ -197,15 +264,25 @@ function App() {
   return (
     <>
       <header className="navbar">
-        <a href="#top" className="brand">
+        <button type="button" className="brand" onClick={() => setCurrentPage('home')} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 0 }}>
           <div className="brand-icon">+</div>
           MediConnect
-        </a>
+        </button>
         <nav className="nav-links" aria-label="Primary navigation">
-          <a href="#services">Why MediConnect</a>
-          <a href="#booking">Book a visit</a>
+          <button type="button" className="nav-link-button" onClick={() => setCurrentPage('home')}>
+            Why MediConnect
+          </button>
+          <button type="button" className="nav-link-button" onClick={() => setCurrentPage('booking')}>
+            Book a visit
+          </button>
+          <button type="button" className="nav-link-button" onClick={() => setCurrentPage(adminUser ? 'admin-dashboard' : 'admin-login')}>
+            {adminUser ? 'Admin dashboard' : 'Admin'}
+          </button>
         </nav>
         <div className="nav-actions">
+          <button type="button" className="admin-mobile-link" onClick={() => setCurrentPage(adminUser ? 'admin-dashboard' : 'admin-login')}>
+            {adminUser ? 'Admin' : 'Admin login'}
+          </button>
           <div id="userProfile" className="user-pill" style={{ display: currentUser ? 'inline-flex' : 'none' }}>
             <span>👤</span>
             <span id="userNameText">{currentUser?.name || 'Guest'}</span>
@@ -214,44 +291,96 @@ function App() {
             id="authTriggerBtn"
             className="auth-btn"
             type="button"
-            onClick={currentUser ? handleLogout : () => setIsAuthOpen(true)}
+            onClick={currentPage === 'admin-dashboard' ? handleAdminLogout : currentUser ? handleLogout : () => setIsAuthOpen(true)}
           >
-            {currentUser ? 'Logout' : 'Login / Register'}
+            {currentPage === 'admin-dashboard' ? 'Admin logout' : currentUser ? 'Logout' : 'Login / Register'}
           </button>
         </div>
       </header>
 
-      <main id="top">
-        <section className="landing-hero">
-          <div className="landing-copy">
-            <div className="eyebrow"><span className="eyebrow-dot" /> Healthcare, made easier</div>
-            <h1>Better care starts with a <em>simpler visit.</em></h1>
-            <p className="landing-lede">Find trusted specialists, choose a convenient OPD slot, and reserve your token before you arrive.</p>
-            <div className="landing-actions">
-              <a className="landing-cta" href="#booking">Book an appointment <span aria-hidden="true">↗</span></a>
-              <a className="landing-secondary" href="#services">Explore the experience <span aria-hidden="true">↓</span></a>
+      {currentPage === 'admin-login' ? (
+        <main className="admin-page">
+          <section className="admin-login-panel">
+            <p className="booking-kicker">MediConnect administration</p>
+            <h1>Admin sign in</h1>
+            <p className="admin-description">Sign in to review confirmed patient appointments.</p>
+            <form onSubmit={handleAdminLogin}>
+              <label htmlFor="adminEmail">Admin email</label>
+              <input id="adminEmail" type="email" autoComplete="username" required value={adminEmail} onChange={(event) => setAdminEmail(event.target.value)} />
+              <label htmlFor="adminPassword">Password</label>
+              <input id="adminPassword" type="password" autoComplete="current-password" required value={adminPassword} onChange={(event) => setAdminPassword(event.target.value)} />
+              {adminLoginError && <p className="admin-login-error" role="alert">{adminLoginError}</p>}
+              <button type="submit" className="btn btn-primary">Sign in to admin</button>
+            </form>
+            <p className="admin-demo-note">Demo credentials: admin@mediconnect.com / Admin@123</p>
+          </section>
+        </main>
+      ) : currentPage === 'admin-dashboard' && adminUser ? (
+        <main className="admin-page admin-dashboard">
+          <div className="admin-heading">
+            <div>
+              <p className="booking-kicker">MediConnect administration</p>
+              <h1>Booked appointments</h1>
+              <p className="admin-description">Patient and visit details for confirmed bookings.</p>
             </div>
-            <div className="landing-proof">
-              <div className="proof-avatars" aria-hidden="true"><span>PN</span><span>RM</span><span>SK</span></div>
-              <p><strong>Trusted by patients across Coimbatore</strong><br /><span>Real specialists · Live OPD availability</span></p>
+            <div className="admin-total"><strong>{appointments.length}</strong><span>Total bookings</span></div>
+          </div>
+          {appointments.length ? (
+            <div className="appointments-table-wrap">
+              <table className="appointments-table">
+                <thead><tr><th>Patient</th><th>Contact</th><th>Doctor &amp; hospital</th><th>Visit</th><th>Token</th><th>Payment</th></tr></thead>
+                <tbody>
+                  {[...appointments].sort((a, b) => `${a.date} ${a.time}`.localeCompare(`${b.date} ${b.time}`)).map((appointment) => (
+                    <tr key={appointment.id}>
+                      <td><strong>{appointment.patientName}</strong><span>{appointment.patientAge} years · For {appointment.patientType}</span></td>
+                      <td>{appointment.patientEmail || 'Not provided'}</td>
+                      <td><strong>{appointment.doctorName}</strong><span>{appointment.hospital}</span></td>
+                      <td><strong>{appointment.date}</strong><span>{appointment.time}</span></td>
+                      <td><span className="appointment-token">#{appointment.seat}</span></td>
+                      <td><strong>{appointment.paymentMethod || 'Not recorded'}</strong><span>{appointment.paymentStatus || 'Status unavailable'}</span></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-          </div>
-          <div className="landing-art" aria-label="MediConnect appointment illustration">
-            <div className="art-glow" />
-            <div className="art-card art-card-top"><span className="art-icon">✓</span><div><strong>Appointment confirmed</strong><small>Today, 10:00 AM</small></div></div>
-            <div className="art-card art-card-bottom"><span className="pulse-dot" /><div><strong>Live token updates</strong><small>Know before you go</small></div></div>
-          </div>
-        </section>
+          ) : (
+            <div className="admin-empty-state"><strong>No appointments yet</strong><p>Confirmed bookings will appear here.</p></div>
+          )}
+        </main>
+      ) : currentPage === 'home' ? (
+        <>
+          <main id="top">
+            <section className="landing-hero">
+              <div className="landing-copy">
+                <div className="eyebrow"><span className="eyebrow-dot" /> Healthcare, made easier</div>
+                <h1>Better care starts with a <em>simpler visit.</em></h1>
+                <p className="landing-lede">Find trusted specialists, choose a convenient OPD slot, and reserve your token before you arrive.</p>
+                <div className="landing-actions">
+                  <button type="button" className="landing-cta" onClick={() => setCurrentPage('booking')}>Book an appointment <span aria-hidden="true">↗</span></button>
+                  <a className="landing-secondary" href="#services">Explore the experience <span aria-hidden="true">↓</span></a>
+                </div>
+                <div className="landing-proof">
+                  <div className="proof-avatars" aria-hidden="true"><span>PN</span><span>RM</span><span>SK</span></div>
+                  <p><strong>Trusted by patients across Coimbatore</strong><br /><span>Real specialists · Live OPD availability</span></p>
+                </div>
+              </div>
+              <div className="landing-art" aria-label="MediConnect appointment illustration">
+                <div className="art-glow" />
+                <div className="art-card art-card-top"><span className="art-icon">✓</span><div><strong>Appointment confirmed</strong><small>Today, 10:00 AM</small></div></div>
+                <div className="art-card art-card-bottom"><span className="pulse-dot" /><div><strong>Live token updates</strong><small>Know before you go</small></div></div>
+              </div>
+            </section>
 
-        <section className="service-strip" id="services" aria-label="MediConnect benefits">
-          <div className="service-item"><span className="service-icon">01</span><div><strong>Choose with confidence</strong><p>Qualified specialists at leading hospitals.</p></div></div>
-          <div className="service-item"><span className="service-icon">02</span><div><strong>Skip the uncertainty</strong><p>See available slots and live token status.</p></div></div>
-          <div className="service-item"><span className="service-icon">03</span><div><strong>Arrive prepared</strong><p>Reserve your visit in a few simple steps.</p></div></div>
-        </section>
-      </main>
-
-      <div className="container" id="booking">
-        <div className="booking-intro">
+            <section className="service-strip" id="services" aria-label="MediConnect benefits">
+              <div className="service-item"><span className="service-icon">01</span><div><strong>Choose with confidence</strong><p>Qualified specialists at leading hospitals.</p></div></div>
+              <div className="service-item"><span className="service-icon">02</span><div><strong>Skip the uncertainty</strong><p>See available slots and live token status.</p></div></div>
+              <div className="service-item"><span className="service-icon">03</span><div><strong>Arrive prepared</strong><p>Reserve your visit in a few simple steps.</p></div></div>
+            </section>
+          </main>
+        </>
+      ) : (
+        <div className="container" id="booking">
+          <div className="booking-intro">
           <div>
             <p className="booking-kicker">Your care, your time</p>
             <h2>Reserve your OPD token</h2>
@@ -427,7 +556,6 @@ function App() {
 
           {showPayment && selectedDoctor && (
             <div id="paymentArea" style={{ display: 'block' }}>
-              <div className="gpay-badge">💳 Google Pay / PhonePe UPI</div>
               <div id="bookingSummary" className="booking-summary">
                 <div className="summary-item"><strong>Patient Profile</strong>{patientName || patientType} ({patientAge} Yrs)</div>
                 <div className="summary-item"><strong>Doctor</strong>{selectedDoctor.name}</div>
@@ -436,30 +564,45 @@ function App() {
                 <div className="summary-item"><strong>Token Assigned</strong>Token #{seat}</div>
                 <div className="summary-item"><strong>OPD Status</strong>On Schedule</div>
               </div>
-              <div id="qrContainer">
-                <img src={qrImage} alt="UPI QR" style={{ borderRadius: '8px', width: '160px', height: '160px' }} />
-              </div>
-              <div style={{ fontSize: '11px', color: 'var(--muted)', marginBottom: '12px' }}>
-                Scan the QR with any UPI app and complete the token reservation.
-              </div>
-
-              <div className="utr-verify-box">
-                <label style={{ fontSize: '12px', fontWeight: 800, display: 'block', marginBottom: '6px' }}>
-                  🧾 Enter 12-Digit UPI Ref / UTR Number after payment:
+              <fieldset className="payment-choice">
+                <legend>Choose how you will pay</legend>
+                <label className={`payment-choice-option ${paymentMethod === 'online' ? 'selected' : ''}`}>
+                  <input type="radio" name="paymentMethod" value="online" checked={paymentMethod === 'online'} onChange={() => { setPaymentMethod('online'); setPaymentVerified(false); setUtr(''); }} />
+                  <span><strong>Pay online</strong><small>UPI payment</small></span>
                 </label>
-                <input type="text" id="utrNumberInput" placeholder="e.g. 423819208391" maxLength="12" value={utr} onChange={(e) => setUtr(e.target.value)} />
-                <button id="verifyBtn" className="btn btn-verify" onClick={handleVerify} style={{ marginTop: '8px' }}>
-                  Verify Payment UTR
+                <label className={`payment-choice-option ${paymentMethod === 'hospital' ? 'selected' : ''}`}>
+                  <input type="radio" name="paymentMethod" value="hospital" checked={paymentMethod === 'hospital'} onChange={() => { setPaymentMethod('hospital'); setPaymentVerified(false); setUtr(''); }} />
+                  <span><strong>Pay at hospital</strong><small>Pay during your visit</small></span>
+                </label>
+              </fieldset>
+
+              {paymentMethod === 'online' && (
+                <>
+                  <div className="gpay-badge">💳 Google Pay / PhonePe UPI</div>
+                  <div id="qrContainer">
+                    <img src={qrImage} alt="UPI QR" style={{ borderRadius: '8px', width: '160px', height: '160px' }} />
+                  </div>
+                  <p className="payment-demo-note">Demo flow: enter the UTR from your payment. This page checks its format only; it does not process or verify a real payment.</p>
+                  <div className="utr-verify-box">
+                    <label htmlFor="utrNumberInput" style={{ fontSize: '12px', fontWeight: 800, display: 'block', marginBottom: '6px' }}>
+                      Enter the 12-digit UPI reference / UTR:
+                    </label>
+                    <input type="text" id="utrNumberInput" placeholder="e.g. 423819208391" maxLength="12" value={utr} onChange={(e) => { setUtr(e.target.value); setPaymentVerified(false); }} />
+                    <button id="verifyBtn" type="button" className="btn btn-verify" onClick={handleVerify} style={{ marginTop: '8px' }}>
+                      Process online payment
+                    </button>
+                  </div>
+                  {paymentVerified && <div id="payStatus" className="status-box status-verified" role="status">UTR format checked. Submit your appointment below.</div>}
+                </>
+              )}
+
+              {paymentMethod === 'hospital' && <div className="status-box status-waiting" role="status">Payment is due at the hospital during your visit.</div>}
+
+              {canSubmitAppointment && (
+                <button id="confirmBtn" type="button" className="btn btn-primary" onClick={handleConfirmBooking}>
+                  Submit appointment
                 </button>
-              </div>
-
-              <div id="payStatus" className={`status-box ${paymentVerified ? 'status-verified' : 'status-waiting'}`}>
-                {paymentVerified ? `✅ UTR ${utr} Verified! Click Confirm to finalize.` : 'Scan QR & enter 12-digit UTR to unlock confirmation'}
-              </div>
-
-              <button id="confirmBtn" className="btn btn-primary" onClick={handleConfirmBooking} disabled={!paymentVerified}>
-                Confirm Appointment Token
-              </button>
+              )}
             </div>
           )}
 
@@ -469,9 +612,10 @@ function App() {
         </main>
 
         <div className="footer">
-          © 2026 MediConnect · Live Project: <a href="https://jeevinth008-pixel.github.io/Mediconnect/" target="_blank" rel="noreferrer">jeevinth008-pixel.github.io/Mediconnect</a>
+          © 2026 MediConnect · <a className="medai-footer-button" href="https://jeevinth008-pixel.github.io/Mediconnect/" target="_blank" rel="noopener noreferrer">MedAI</a>
         </div>
       </div>
+      )}
 
       <div id="authModal" className="modal-overlay" style={{ display: isAuthOpen ? 'grid' : 'none' }}>
         <div className="modal-card">
@@ -486,6 +630,7 @@ function App() {
           </form>
         </div>
       </div>
+
     </>
   )
 }
