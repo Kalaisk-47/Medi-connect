@@ -290,11 +290,16 @@ function App() {
   const [currentPage, setCurrentPage] = useState('home')
   const [isAuthOpen, setIsAuthOpen] = useState(false)
   const [loginInput, setLoginInput] = useState('')
+<<<<<<< Updated upstream
   const [appointments, setAppointments] = useState(readAppointments)
   const [adminUser, setAdminUser] = useState(() => localStorage.getItem('mediconnect_admin') === 'true')
   const [adminEmail, setAdminEmail] = useState('')
   const [adminPassword, setAdminPassword] = useState('')
   const [adminLoginError, setAdminLoginError] = useState('')
+=======
+  const [loginPassword, setLoginPassword] = useState('')
+  const [loginError, setLoginError] = useState('')
+>>>>>>> Stashed changes
   const [currentUser, setCurrentUser] = useState(() => {
     const saved = localStorage.getItem('mediconnect_user')
     return saved ? JSON.parse(saved) : null
@@ -384,12 +389,27 @@ function App() {
   const handleLogin = (event) => {
     event.preventDefault()
     const identifier = loginInput.trim()
+    const password = loginPassword.trim()
+    const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(identifier)
+    const isMobile = /^\+?[0-9\s-]{10,}$/.test(identifier)
+
+    if (!isEmail && !isMobile) {
+      setLoginError('Enter a valid email address or mobile number.')
+      return
+    }
+    if (password.length < 6) {
+      setLoginError('Password must be at least 6 characters.')
+      return
+    }
+
     const nextUser = { name: identifier.split('@')[0] || 'Patient', email: identifier }
     localStorage.setItem('mediconnect_user', JSON.stringify(nextUser))
     setCurrentUser(nextUser)
     setPatientName(nextUser.name)
     setIsAuthOpen(false)
     setLoginInput('')
+    setLoginPassword('')
+    setLoginError('')
   }
 
   const handleLogout = () => {
@@ -469,6 +489,8 @@ function App() {
     setPaymentVerified(false)
     setIsAuthOpen(false)
     setLoginInput('')
+    setLoginPassword('')
+    setLoginError('')
   }
 
   const doctorList = specialty ? doctors[specialty] : []
@@ -854,15 +876,22 @@ function App() {
       </div>
       )}
 
-      <div id="authModal" className="modal-overlay" style={{ display: isAuthOpen ? 'grid' : 'none' }}>
+      <div id="authModal" className="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="authTitle" style={{ display: isAuthOpen ? 'grid' : 'none' }}>
         <div className="modal-card">
-          <button className="modal-close" type="button" onClick={() => setIsAuthOpen(false)}>✕</button>
-          <h3 style={{ marginBottom: '14px', fontSize: '16px', color: 'var(--navy)' }}>Patient Sign In</h3>
+          <button className="modal-close" type="button" aria-label="Close sign in" onClick={() => setIsAuthOpen(false)}>✕</button>
+          <p className="modal-kicker">MediConnect account</p>
+          <h3 id="authTitle">Patient Sign In</h3>
+          <p className="modal-copy">Sign in to keep your appointments and patient details together.</p>
           <form onSubmit={handleLogin}>
-            <div style={{ marginBottom: '10px', textAlign: 'left' }}>
-              <label style={{ fontSize: '11px', fontWeight: 700, color: 'var(--muted)' }}>Email / Mobile</label>
-              <input type="text" id="loginId" placeholder="name@domain.com" required value={loginInput} onChange={(e) => setLoginInput(e.target.value)} />
+            <div className="auth-field">
+              <label htmlFor="loginId">Email or mobile</label>
+              <input type="text" id="loginId" placeholder="name@domain.com" autoComplete="username" required value={loginInput} onChange={(e) => { setLoginInput(e.target.value); setLoginError('') }} />
             </div>
+            <div className="auth-field">
+              <label htmlFor="loginPassword">Password</label>
+              <input type="password" id="loginPassword" placeholder="At least 6 characters" autoComplete="current-password" required value={loginPassword} onChange={(e) => { setLoginPassword(e.target.value); setLoginError('') }} />
+            </div>
+            {loginError && <p className="auth-error" role="alert">{loginError}</p>}
             <button type="submit" className="btn btn-primary">Login Now</button>
           </form>
         </div>
