@@ -298,7 +298,25 @@ function App() {
         </div>
       </header>
 
-      {currentPage === 'admin-login' ? (
+      {currentPage === 'hospitals' ? (
+        <main className="map-page">
+          <div className="map-heading">
+            <div>
+              <p className="booking-kicker">Find care nearby</p>
+              <h1>Hospitals in Coimbatore</h1>
+            </div>
+            <button type="button" className="map-back-button" onClick={() => setCurrentPage('home')}>Back to MediConnect</button>
+          </div>
+          <iframe
+            className="hospital-map"
+            src="https://www.google.com/maps/embed?pb=!1m12!1m8!1m3!1d31330.61570071956!2d76.9745064!3d11.0140768!3m2!1i1024!2i768!4f13.1!2m1!1shospitals%20in%20coimbatore!5e0!3m2!1sen!2sin!4v1792769761565!5m2!1sen!2sin"
+            title="Hospitals in Coimbatore on Google Maps"
+            allowFullScreen
+            loading="lazy"
+            referrerPolicy="strict-origin-when-cross-origin"
+          />
+        </main>
+      ) : currentPage === 'admin-login' ? (
         <main className="admin-page">
           <section className="admin-login-panel">
             <p className="booking-kicker">MediConnect administration</p>
@@ -371,10 +389,10 @@ function App() {
               </div>
             </section>
 
-            <section className="service-strip" id="services" aria-label="MediConnect benefits">
-              <div className="service-item"><span className="service-icon">01</span><div><strong>Choose with confidence</strong><p>Qualified specialists at leading hospitals.</p></div></div>
-              <div className="service-item"><span className="service-icon">02</span><div><strong>Skip the uncertainty</strong><p>See available slots and live token status.</p></div></div>
-              <div className="service-item"><span className="service-icon">03</span><div><strong>Arrive prepared</strong><p>Reserve your visit in a few simple steps.</p></div></div>
+            <section className="service-strip" id="services" aria-label="Locate hospitals">
+              <button type="button" className="hospital-locator-button" onClick={() => setCurrentPage('hospitals')}>
+                Locate hospitals <span aria-hidden="true">↗</span>
+              </button>
             </section>
           </main>
         </>
