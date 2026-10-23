@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import './App.css'
 
 const doctors = {
@@ -25,11 +25,85 @@ const doctors = {
 const slots = ['09:00 AM', '10:00 AM', '11:00 AM', '02:00 PM', '03:00 PM', '04:00 PM']
 const TOTAL_SEATS = 10
 const ADMIN_CREDENTIALS = { email: 'admin@mediconnect.com', password: 'Admin@123' }
+const PRESCRIPTION_DB_NAME = 'mediconnect-prescriptions'
+const PRESCRIPTION_STORE_NAME = 'attachments'
 const readAppointments = () => {
   try {
     return JSON.parse(localStorage.getItem('mediconnect_appointments') || '[]')
   } catch {
     return []
+  }
+}
+
+const openPrescriptionDatabase = () => new Promise((resolve, reject) => {
+  if (!window.indexedDB) {
+    reject(new Error('Prescription storage is not available in this browser.'))
+    return
+  }
+
+  const request = window.indexedDB.open(PRESCRIPTION_DB_NAME, 1)
+  request.onupgradeneeded = () => {
+    const database = request.result
+    if (!database.objectStoreNames.contains(PRESCRIPTION_STORE_NAME)) {
+      database.createObjectStore(PRESCRIPTION_STORE_NAME, { keyPath: 'id', autoIncrement: true })
+    }
+  }
+  request.onsuccess = () => resolve(request.result)
+  request.onerror = () => reject(request.error || new Error('Could not open prescription storage.'))
+  request.onblocked = () => reject(new Error('Prescription storage is blocked by another open page.'))
+})
+
+const loadPrescriptionAttachments = async () => {
+  const database = await openPrescriptionDatabase()
+  try {
+    return await new Promise((resolve, reject) => {
+      const transaction = database.transaction(PRESCRIPTION_STORE_NAME, 'readonly')
+      const request = transaction.objectStore(PRESCRIPTION_STORE_NAME).getAll()
+      request.onsuccess = () => resolve(request.result)
+      request.onerror = () => reject(request.error || new Error('Could not load saved prescriptions.'))
+      transaction.onerror = () => reject(transaction.error || new Error('Could not load saved prescriptions.'))
+    })
+  } finally {
+    database.close()
+  }
+}
+
+const savePrescriptionAttachment = async (file) => {
+  const database = await openPrescriptionDatabase()
+  try {
+    return await new Promise((resolve, reject) => {
+      const transaction = database.transaction(PRESCRIPTION_STORE_NAME, 'readwrite')
+      const attachment = {
+        name: file.name,
+        type: file.type,
+        blob: file,
+        addedAt: Date.now()
+      }
+      const request = transaction.objectStore(PRESCRIPTION_STORE_NAME).add(attachment)
+      transaction.oncomplete = () => resolve({
+        id: request.result,
+        ...attachment
+      })
+      transaction.onerror = () => reject(transaction.error || new Error('Could not save this prescription.'))
+      transaction.onabort = () => reject(transaction.error || new Error('Saving this prescription was cancelled.'))
+    })
+  } finally {
+    database.close()
+  }
+}
+
+const deletePrescriptionAttachment = async (id) => {
+  const database = await openPrescriptionDatabase()
+  try {
+    await new Promise((resolve, reject) => {
+      const transaction = database.transaction(PRESCRIPTION_STORE_NAME, 'readwrite')
+      transaction.objectStore(PRESCRIPTION_STORE_NAME).delete(id)
+      transaction.oncomplete = resolve
+      transaction.onerror = () => reject(transaction.error || new Error('Could not remove this prescription.'))
+      transaction.onabort = () => reject(transaction.error || new Error('Removing this prescription was cancelled.'))
+    })
+  } finally {
+    database.close()
   }
 }
 
@@ -54,6 +128,147 @@ const getDeterministicBookedSeats = (doctorId, date, time) => {
     if ((seed + i * 3) % 4 === 0) booked.push(i)
   }
   return booked
+}
+
+function useBlobUrl(blob) {
+  const [url, setUrl] = useState('')
+  useEffect(() => {
+    const objectUrl = URL.createObjectURL(blob)
+    const frame = window.requestAnimationFrame(() => setUrl(objectUrl))
+    return () => {
+      window.cancelAnimationFrame(frame)
+      URL.revokeObjectURL(objectUrl)
+    }
+  }, [blob])
+  return url
+}
+
+function PrescriptionThumbnail({ attachment }) {
+  const thumbnailUrl = useBlobUrl(attachment.blob)
+
+  return <img src={thumbnailUrl} alt="" />
+}
+
+function PrescriptionPreview({ attachment, onClose }) {
+  const previewUrl = useBlobUrl(attachment.blob)
+
+  return (
+    <div className="prescription-preview-overlay" role="presentation" onClick={(event) => {
+      if (event.target === event.currentTarget) onClose()
+    }}>
+      <section className="prescription-preview-dialog" role="dialog" aria-modal="true" aria-label={`Preview ${attachment.name}`}>
+        <div className="prescription-preview-header">
+          <strong>{attachment.name}</strong>
+          <button type="button" className="prescription-remove-button" onClick={onClose} aria-label="Close prescription preview">×</button>
+        </div>
+        {attachment.type.startsWith('image/') ? (
+          <img className="prescription-full-preview" src={previewUrl} alt={attachment.name} />
+        ) : (
+          <iframe className="prescription-pdf-preview" src={previewUrl} title={`Prescription: ${attachment.name}`} />
+        )}
+      </section>
+    </div>
+  )
+}
+
+function PrescriptionAttachments() {
+  const [attachments, setAttachments] = useState([])
+  const [storageError, setStorageError] = useState('')
+  const [isLoading, setIsLoading] = useState(true)
+  const [previewAttachment, setPreviewAttachment] = useState(null)
+  const fileInputRef = useRef(null)
+
+  useEffect(() => {
+    let isMounted = true
+    loadPrescriptionAttachments()
+      .then((savedAttachments) => {
+        if (isMounted) setAttachments(savedAttachments.sort((a, b) => b.addedAt - a.addedAt))
+      })
+      .catch((error) => {
+        if (isMounted) setStorageError(error.message)
+      })
+      .finally(() => {
+        if (isMounted) setIsLoading(false)
+      })
+    return () => { isMounted = false }
+  }, [])
+
+  const handleFilesSelected = async (event) => {
+    const files = Array.from(event.target.files || [])
+    event.target.value = ''
+    setStorageError('')
+    for (const file of files) {
+      if (!file.type.startsWith('image/') && file.type !== 'application/pdf') {
+        setStorageError(`${file.name} is not a supported image or PDF.`)
+        continue
+      }
+      try {
+        const savedAttachment = await savePrescriptionAttachment(file)
+        setAttachments((current) => [savedAttachment, ...current])
+      } catch (error) {
+        setStorageError(`Could not save ${file.name}: ${error.message}`)
+      }
+    }
+  }
+
+  const handleDelete = async (id) => {
+    setStorageError('')
+    try {
+      await deletePrescriptionAttachment(id)
+      setAttachments((current) => current.filter((attachment) => attachment.id !== id))
+      if (previewAttachment?.id === id) setPreviewAttachment(null)
+    } catch (error) {
+      setStorageError(error.message)
+    }
+  }
+
+  return (
+    <aside className="prescriptions-panel" aria-label="Prescription attachments">
+      <div className="prescriptions-heading">
+        <span className="prescriptions-icon" aria-hidden="true">＋</span>
+        <div>
+          <h2>Prescriptions</h2>
+          <p>Keep your medical documents handy.</p>
+        </div>
+      </div>
+      <input
+        ref={fileInputRef}
+        className="prescription-file-input"
+        type="file"
+        accept="image/*,application/pdf,.pdf"
+        multiple
+        onChange={handleFilesSelected}
+        aria-label="Choose prescription images or PDF files"
+      />
+      <button type="button" className="prescription-add-button" onClick={() => fileInputRef.current?.click()}>
+        <span aria-hidden="true">＋</span> Add prescriptions
+      </button>
+      <p className="prescriptions-storage-note">Images and PDFs are saved on this device.</p>
+      {storageError && <p className="prescriptions-error" role="alert">{storageError}</p>}
+      {isLoading ? (
+        <p className="prescriptions-empty" role="status">Loading saved prescriptions…</p>
+      ) : attachments.length ? (
+        <ul className="prescription-list">
+          {attachments.map((attachment) => (
+            <li className="prescription-item" key={attachment.id}>
+              <button type="button" className="prescription-preview-button" onClick={() => setPreviewAttachment(attachment)}>
+                {attachment.type.startsWith('image/') ? (
+                  <PrescriptionThumbnail attachment={attachment} />
+                ) : (
+                  <span className="prescription-pdf-icon" aria-hidden="true">PDF</span>
+                )}
+                <span className="prescription-file-name">{attachment.name}</span>
+              </button>
+              <button type="button" className="prescription-remove-button" onClick={() => handleDelete(attachment.id)} aria-label={`Remove ${attachment.name}`}>×</button>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="prescriptions-empty">No prescriptions attached yet.</p>
+      )}
+      {previewAttachment && <PrescriptionPreview key={previewAttachment.id} attachment={previewAttachment} onClose={() => setPreviewAttachment(null)} />}
+    </aside>
+  )
 }
 
 function App() {
@@ -417,16 +632,17 @@ function App() {
           <div style={{ color: '#94a3b8', fontSize: '11px' }}>⏱ Avg Consultation: ~6 mins</div>
         </div>
 
-        <div className="symptom-section">
-          <div className="section-title">⚡ Quick Symptom Matcher (Click to auto-select)</div>
-          <div className="chip-grid">
-            <div className="s-chip" onClick={() => handleSymptomMatch('ENT')}>👂 Ear / Throat Pain</div>
-            <div className="s-chip" onClick={() => handleSymptomMatch('CARDIOLOGY')}>❤️ Chest Pain / High BP</div>
-            <div className="s-chip" onClick={() => handleSymptomMatch('NEUROSURGERY')}>🧠 Headache / Spine Pain</div>
-          </div>
-        </div>
-
-        <main className="card">
+        <div className="booking-layout">
+          <div className="booking-form-column">
+            <div className="symptom-section">
+              <div className="section-title">⚡ Quick Symptom Matcher (Click to auto-select)</div>
+              <div className="chip-grid">
+                <div className="s-chip" onClick={() => handleSymptomMatch('ENT')}>👂 Ear / Throat Pain</div>
+                <div className="s-chip" onClick={() => handleSymptomMatch('CARDIOLOGY')}>❤️ Chest Pain / High BP</div>
+                <div className="s-chip" onClick={() => handleSymptomMatch('NEUROSURGERY')}>🧠 Headache / Spine Pain</div>
+              </div>
+            </div>
+            <main className="card">
           <div className="progress-bar">
             <span className={specialty ? 'active' : ''} />
             <span className={doctorId ? 'active' : ''} />
@@ -627,7 +843,10 @@ function App() {
           <button className="btn btn-secondary" onClick={resetForm} style={{ marginTop: '16px' }}>
             Reset Form
           </button>
-        </main>
+            </main>
+          </div>
+          <PrescriptionAttachments />
+        </div>
 
         <div className="footer">
           © 2026 MediConnect · <a className="medai-footer-button" href="https://jeevinth008-pixel.github.io/Mediconnect/" target="_blank" rel="noopener noreferrer">MedAI</a>
