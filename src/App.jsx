@@ -609,6 +609,15 @@ function App() {
       }))
       .sort((first, second) => first.distance - second.distance)[0]
     : null
+  const closestHospitals = userLocation
+    ? nearbyHospitals
+      .map((hospital) => ({
+        ...hospital,
+        distance: distanceBetweenCoordinates(userLocation.latitude, userLocation.longitude, hospital.latitude, hospital.longitude)
+      }))
+      .sort((first, second) => first.distance - second.distance)
+      .slice(0, 3)
+    : []
   const hospitalMapUrl = userLocation
     ? `https://www.google.com/maps?q=hospitals+near+${userLocation.latitude},${userLocation.longitude}&output=embed`
     : 'https://www.google.com/maps/embed?pb=!1m12!1m8!1m3!1d31330.61570071956!2d76.9745064!3d11.0140768!3m2!1i1024!2i768!4f13.1!2m1!1shospitals%20in%20coimbatore!5e0!3m2!1sen!2sin!4v1792769761565!5m2!1sen!2sin'
@@ -696,6 +705,43 @@ function App() {
               <a className="directions-button" href={`https://www.google.com/maps/dir/?api=1&origin=${userLocation.latitude},${userLocation.longitude}&destination=${nearestHospital.latitude},${nearestHospital.longitude}`} target="_blank" rel="noopener noreferrer">Get directions ↗</a>
             </section>
           )}
+          <section className="closest-hospitals-card" aria-label="Three closest hospitals">
+            <div className="closest-hospitals-heading">
+              <div>
+                <p className="booking-kicker">Emergency care shortlist</p>
+                <h2>Three closest hospitals</h2>
+                <p>Hospitals are ranked from your shared live location.</p>
+              </div>
+              <span className="hospital-count-badge">{closestHospitals.length || 0} nearby</span>
+            </div>
+            {closestHospitals.length ? (
+              <div className="closest-hospital-list">
+                {closestHospitals.map((hospital, index) => {
+                  const sharedAmbulance = sharedAmbulances[0]
+                  return (
+                    <article className="closest-hospital-item" key={hospital.name}>
+                      <span className="hospital-rank">{index + 1}</span>
+                      <div className="closest-hospital-info">
+                        <strong>{hospital.name}</strong>
+                        <p>{hospital.location} · {hospital.distance.toFixed(1)} km away</p>
+                        <span className={sharedAmbulance ? 'ambulance-availability available' : 'ambulance-availability'}>
+                          {sharedAmbulance ? 'Ambulance available now' : 'No shared ambulance currently'}
+                        </span>
+                      </div>
+                      <div className="closest-hospital-actions">
+                        <a className="directions-button" href={`https://www.google.com/maps/dir/?api=1&origin=${userLocation.latitude},${userLocation.longitude}&destination=${hospital.latitude},${hospital.longitude}`} target="_blank" rel="noopener noreferrer">Directions</a>
+                        {sharedAmbulance && (
+                          <a className="emergency-call-button" href={`tel:+91${sharedAmbulance.phone}`}>Call ambulance</a>
+                        )}
+                      </div>
+                    </article>
+                  )
+                })}
+              </div>
+            ) : (
+              <div className="closest-hospitals-empty">Share your location above to see the three closest hospitals and emergency ambulance actions.</div>
+            )}
+          </section>
           <section className="ambulance-nearby-card" aria-label="Ambulance details near hospitals">
             <div className="ambulance-nearby-heading">
               <div>
