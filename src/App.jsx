@@ -51,6 +51,24 @@ const readSharedAmbulances = () => {
   }
 }
 
+const nearbyHospitals = [
+  { name: 'PSG Hospitals', location: 'Peelamedu, Coimbatore', latitude: 11.0236, longitude: 76.9345 },
+  { name: 'Sri Ramakrishna Hospital', location: 'Siddhapudur, Coimbatore', latitude: 11.0183, longitude: 76.9714 },
+  { name: 'KMCH', location: 'Avinashi Road, Coimbatore', latitude: 11.051, longitude: 76.9947 },
+  { name: 'Ganga Hospital', location: 'Swarnambika Layout, Coimbatore', latitude: 11.0074, longitude: 76.9504 }
+]
+
+const distanceBetweenCoordinates = (firstLatitude, firstLongitude, secondLatitude, secondLongitude) => {
+  const earthRadiusKm = 6371
+  const latitudeDelta = (secondLatitude - firstLatitude) * Math.PI / 180
+  const longitudeDelta = (secondLongitude - firstLongitude) * Math.PI / 180
+  const firstLatitudeRadians = firstLatitude * Math.PI / 180
+  const secondLatitudeRadians = secondLatitude * Math.PI / 180
+  const haversine = Math.sin(latitudeDelta / 2) ** 2
+    + Math.sin(longitudeDelta / 2) ** 2 * Math.cos(firstLatitudeRadians) * Math.cos(secondLatitudeRadians)
+  return earthRadiusKm * 2 * Math.atan2(Math.sqrt(haversine), Math.sqrt(1 - haversine))
+}
+
 const openPrescriptionDatabase = () => new Promise((resolve, reject) => {
   if (!window.indexedDB) {
     reject(new Error('Prescription storage is not available in this browser.'))
@@ -317,6 +335,9 @@ function App() {
   const [ambulanceError, setAmbulanceError] = useState('')
   const [sharedAmbulances, setSharedAmbulances] = useState(readSharedAmbulances)
   const [isSharingLocation, setIsSharingLocation] = useState(() => readSharedAmbulances().length > 0)
+  const [userLocation, setUserLocation] = useState(null)
+  const [locationError, setLocationError] = useState('')
+  const [isLocatingUser, setIsLocatingUser] = useState(false)
   const [currentUser, setCurrentUser] = useState(() => {
     const saved = localStorage.getItem('mediconnect_user')
     return saved ? JSON.parse(saved) : null
@@ -532,6 +553,26 @@ function App() {
     setAmbulanceDriver(null)
   }
 
+  const handleFindNearestHospital = () => {
+    if (!navigator.geolocation) {
+      setLocationError('Location sharing is not supported by this browser.')
+      return
+    }
+    setLocationError('')
+    setIsLocatingUser(true)
+    navigator.geolocation.getCurrentPosition(
+      ({ coords }) => {
+        setUserLocation({ latitude: coords.latitude, longitude: coords.longitude })
+        setIsLocatingUser(false)
+      },
+      () => {
+        setLocationError('Location permission was not granted. Please allow location access and try again.')
+        setIsLocatingUser(false)
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    )
+  }
+
   const resetForm = () => {
     setSpecialty('')
     setDoctorId('')
@@ -553,6 +594,17 @@ function App() {
   const dayOfWeek = date ? new Date(`${date}T00:00:00`).getDay() : null
   const isToday = date === getLocalDateString()
   const qrImage = '/payment-qr.svg'
+  const nearestHospital = userLocation
+    ? nearbyHospitals
+      .map((hospital) => ({
+        ...hospital,
+        distance: distanceBetweenCoordinates(userLocation.latitude, userLocation.longitude, hospital.latitude, hospital.longitude)
+      }))
+      .sort((first, second) => first.distance - second.distance)[0]
+    : null
+  const hospitalMapUrl = userLocation
+    ? `https://www.google.com/maps?q=hospitals+near+${userLocation.latitude},${userLocation.longitude}&output=embed`
+    : 'https://www.google.com/maps/embed?pb=!1m12!1m8!1m3!1d31330.61570071956!2d76.9745064!3d11.0140768!3m2!1i1024!2i768!4f13.1!2m1!1shospitals%20in%20coimbatore!5e0!3m2!1sen!2sin!4v1792769761565!5m2!1sen!2sin'
 
   return (
     <>
@@ -599,14 +651,38 @@ function App() {
           <div className="map-heading">
             <div>
               <p className="booking-kicker">Find care nearby</p>
-              <h1>Hospitals in Coimbatore</h1>
+              <h1>Find the nearest hospital</h1>
+              <p className="map-description">Share your location to see hospitals near you and get directions faster.</p>
             </div>
             <button type="button" className="map-back-button" onClick={() => setCurrentPage('home')}>Back to MediConnect</button>
           </div>
+          <section className="location-finder-card" aria-label="Find nearest hospital">
+            <div className="location-finder-copy">
+              <span className="location-pin-icon" aria-hidden="true">⌖</span>
+              <div>
+                <strong>{nearestHospital ? 'Your nearest hospital' : 'Use your location'}</strong>
+                <p>{nearestHospital ? `${nearestHospital.name} is approximately ${nearestHospital.distance.toFixed(1)} km away.` : 'MediConnect only uses your location to find nearby hospitals.'}</p>
+              </div>
+            </div>
+            <button type="button" className="location-share-button" onClick={handleFindNearestHospital} disabled={isLocatingUser}>
+              {isLocatingUser ? 'Finding hospitals…' : userLocation ? 'Update my location' : 'Share my location'}
+            </button>
+          </section>
+          {locationError && <p className="location-error" role="alert">{locationError}</p>}
+          {nearestHospital && (
+            <section className="nearest-hospital-card" aria-label="Nearest hospital">
+              <div>
+                <p className="booking-kicker">Recommended for you</p>
+                <h2>{nearestHospital.name}</h2>
+                <p>{nearestHospital.location} · {nearestHospital.distance.toFixed(1)} km away</p>
+              </div>
+              <a className="directions-button" href={`https://www.google.com/maps/dir/?api=1&origin=${userLocation.latitude},${userLocation.longitude}&destination=${nearestHospital.latitude},${nearestHospital.longitude}`} target="_blank" rel="noopener noreferrer">Get directions ↗</a>
+            </section>
+          )}
           <iframe
             className="hospital-map"
-            src="https://www.google.com/maps/embed?pb=!1m12!1m8!1m3!1d31330.61570071956!2d76.9745064!3d11.0140768!3m2!1i1024!2i768!4f13.1!2m1!1shospitals%20in%20coimbatore!5e0!3m2!1sen!2sin!4v1792769761565!5m2!1sen!2sin"
-            title="Hospitals in Coimbatore on Google Maps"
+            src={hospitalMapUrl}
+            title={userLocation ? 'Hospitals near your location' : 'Hospitals in Coimbatore on Google Maps'}
             allowFullScreen
             loading="lazy"
             referrerPolicy="strict-origin-when-cross-origin"

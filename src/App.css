@@ -315,7 +315,51 @@ body {
   letter-spacing: -1px;
 }
 
+.map-description { margin-top: 9px; color: var(--muted); font-size: 13px; line-height: 1.5; }
 .map-back-button { padding: 12px 18px; font-size: 12px; }
+
+.location-finder-card,
+.nearest-hospital-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 16px;
+  padding: 18px 20px;
+  border: 1px solid #bae6fd;
+  border-radius: 14px;
+  background: #f0f9ff;
+}
+
+.location-finder-copy { display: flex; align-items: center; gap: 12px; }
+.location-pin-icon { display: grid; width: 40px; height: 40px; flex: 0 0 auto; place-items: center; border-radius: 11px; background: #fff; color: var(--primary-dark); font-size: 23px; }
+.location-finder-copy strong { color: var(--navy); font-size: 13px; }
+.location-finder-copy p { margin-top: 4px; color: var(--muted); font-size: 11px; line-height: 1.45; }
+.location-share-button,
+.directions-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 9px;
+  padding: 11px 15px;
+  background: var(--primary);
+  color: #fff;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.location-share-button:hover,
+.directions-button:hover { background: var(--primary-dark); }
+.location-share-button:disabled { opacity: .6; cursor: wait; }
+.location-error { margin: -5px 0 16px; color: var(--danger); font-size: 12px; }
+.nearest-hospital-card { border-color: #bbf7d0; background: #f0fdf4; }
+.nearest-hospital-card h2 { margin-top: 5px; color: var(--navy); font-size: 20px; }
+.nearest-hospital-card p:last-child { margin-top: 5px; color: var(--muted); font-size: 12px; }
+.nearest-hospital-card .booking-kicker { color: #15803d; }
 
 .hospital-map {
   display: block;
@@ -1091,6 +1135,8 @@ select:disabled, input:disabled {
   .map-page { width: min(100% - 32px, 560px); padding: 32px 0 40px; }
   .map-heading { align-items: flex-start; flex-direction: column; gap: 16px; }
   .map-back-button { width: 100%; }
+  .location-finder-card, .nearest-hospital-card { align-items: flex-start; flex-direction: column; }
+  .location-share-button, .directions-button { width: 100%; }
   .hospital-map { height: 65vh; min-height: 320px; }
   .container { width: min(100% - 24px, 560px); margin-top: 18px; }
   .booking-layout { grid-template-columns: 1fr; gap: 0; }
