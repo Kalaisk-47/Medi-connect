@@ -58,6 +58,8 @@ const nearbyHospitals = [
   { name: 'Ganga Hospital', location: 'Swarnambika Layout, Coimbatore', latitude: 11.0074, longitude: 76.9504 }
 ]
 
+const normalizeHospitalName = (name) => name.toLowerCase().replace(/[^a-z0-9]/g, '')
+
 const distanceBetweenCoordinates = (firstLatitude, firstLongitude, secondLatitude, secondLongitude) => {
   const earthRadiusKm = 6371
   const latitudeDelta = (secondLatitude - firstLatitude) * Math.PI / 180
@@ -718,7 +720,7 @@ function App() {
             {closestHospitals.length ? (
               <div className="closest-hospital-list">
                 {closestHospitals.map((hospital, index) => {
-                  const sharedAmbulance = sharedAmbulances[0]
+                  const sharedAmbulance = sharedAmbulances.find((ambulance) => normalizeHospitalName(ambulance.hospital) === normalizeHospitalName(hospital.name))
                   return (
                     <article className="closest-hospital-item" key={hospital.name}>
                       <span className="hospital-rank">{index + 1}</span>
