@@ -356,6 +356,8 @@ body {
 .directions-button:hover { background: var(--primary-dark); }
 .location-share-button:disabled { opacity: .6; cursor: wait; }
 .location-error { margin: -5px 0 16px; color: var(--danger); font-size: 12px; }
+.location-steps { display: grid; gap: 7px; margin: -2px 0 18px 22px; color: var(--muted); font-size: 11px; line-height: 1.45; }
+.location-steps strong { color: var(--slate); }
 .nearest-hospital-card { border-color: #bbf7d0; background: #f0fdf4; }
 .nearest-hospital-card h2 { margin-top: 5px; color: var(--navy); font-size: 20px; }
 .nearest-hospital-card p:last-child { margin-top: 5px; color: var(--muted); font-size: 12px; }

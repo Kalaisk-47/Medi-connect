@@ -555,7 +555,7 @@ function App() {
 
   const handleFindNearestHospital = () => {
     if (!navigator.geolocation) {
-      setLocationError('Location sharing is not supported by this browser.')
+      setLocationError('Location access is not supported by this browser. Please open MediConnect in a current browser.')
       return
     }
     setLocationError('')
@@ -565,8 +565,14 @@ function App() {
         setUserLocation({ latitude: coords.latitude, longitude: coords.longitude })
         setIsLocatingUser(false)
       },
-      () => {
-        setLocationError('Location permission was not granted. Please allow location access and try again.')
+      (error) => {
+        if (error.code === error.PERMISSION_DENIED) {
+          setLocationError('Location access is off. Turn on Location Services in your phone or computer settings, allow this site in your browser, then try again.')
+        } else if (error.code === error.TIMEOUT) {
+          setLocationError('We could not get your location in time. Check that Location Services are on and try again.')
+        } else {
+          setLocationError('We could not determine your location. Turn on Location Services and try again.')
+        }
         setIsLocatingUser(false)
       },
       { enableHighAccuracy: true, timeout: 10000 }
@@ -661,13 +667,20 @@ function App() {
               <span className="location-pin-icon" aria-hidden="true">⌖</span>
               <div>
                 <strong>{nearestHospital ? 'Your nearest hospital' : 'Use your location'}</strong>
-                <p>{nearestHospital ? `${nearestHospital.name} is approximately ${nearestHospital.distance.toFixed(1)} km away.` : 'MediConnect only uses your location to find nearby hospitals.'}</p>
+                <p>{nearestHospital ? `${nearestHospital.name} is approximately ${nearestHospital.distance.toFixed(1)} km away.` : 'Turn on Location Services, allow browser access, and share your current location.'}</p>
               </div>
             </div>
             <button type="button" className="location-share-button" onClick={handleFindNearestHospital} disabled={isLocatingUser}>
               {isLocatingUser ? 'Finding hospitals…' : userLocation ? 'Update my location' : 'Share my location'}
             </button>
           </section>
+          {!userLocation && !locationError && (
+            <ol className="location-steps">
+              <li><strong>Turn on Location</strong> in your phone or computer settings.</li>
+              <li><strong>Allow location access</strong> when your browser asks.</li>
+              <li>Select <strong>Share my location</strong> to find the nearest hospital.</li>
+            </ol>
+          )}
           {locationError && <p className="location-error" role="alert">{locationError}</p>}
           {nearestHospital && (
             <section className="nearest-hospital-card" aria-label="Nearest hospital">
