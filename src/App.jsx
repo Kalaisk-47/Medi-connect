@@ -338,6 +338,7 @@ function App() {
   const [userLocation, setUserLocation] = useState(null)
   const [locationError, setLocationError] = useState('')
   const [isLocatingUser, setIsLocatingUser] = useState(false)
+  const [showAmbulanceDetails, setShowAmbulanceDetails] = useState(false)
   const [currentUser, setCurrentUser] = useState(() => {
     const saved = localStorage.getItem('mediconnect_user')
     return saved ? JSON.parse(saved) : null
@@ -611,6 +612,9 @@ function App() {
   const hospitalMapUrl = userLocation
     ? `https://www.google.com/maps?q=hospitals+near+${userLocation.latitude},${userLocation.longitude}&output=embed`
     : 'https://www.google.com/maps/embed?pb=!1m12!1m8!1m3!1d31330.61570071956!2d76.9745064!3d11.0140768!3m2!1i1024!2i768!4f13.1!2m1!1shospitals%20in%20coimbatore!5e0!3m2!1sen!2sin!4v1792769761565!5m2!1sen!2sin'
+  const ambulanceMapUrl = sharedAmbulances.length
+    ? `https://www.google.com/maps?q=${sharedAmbulances[0].latitude},${sharedAmbulances[0].longitude}&output=embed`
+    : ''
 
   return (
     <>
@@ -692,6 +696,46 @@ function App() {
               <a className="directions-button" href={`https://www.google.com/maps/dir/?api=1&origin=${userLocation.latitude},${userLocation.longitude}&destination=${nearestHospital.latitude},${nearestHospital.longitude}`} target="_blank" rel="noopener noreferrer">Get directions ↗</a>
             </section>
           )}
+          <section className="ambulance-nearby-card" aria-label="Ambulance details near hospitals">
+            <div className="ambulance-nearby-heading">
+              <div>
+                <p className="booking-kicker">Emergency support</p>
+                <h2>Ambulances near hospitals</h2>
+                <p>See available ambulance details and the location shared by a driver.</p>
+              </div>
+              <button type="button" className="ambulance-details-button" onClick={() => setShowAmbulanceDetails((visible) => !visible)}>
+                {showAmbulanceDetails ? 'Hide ambulance details' : 'View ambulance details'}
+              </button>
+            </div>
+            {showAmbulanceDetails && (
+              sharedAmbulances.length ? (
+                <div className="ambulance-details-content">
+                  <div className="shared-ambulance-list">
+                    {sharedAmbulances.map((ambulance) => (
+                      <article className="shared-ambulance" key={ambulance.phone}>
+                        <div className="shared-ambulance-icon">+</div>
+                        <div>
+                          <strong>{ambulance.hospital} ambulance</strong>
+                          <p>Driver ID · +91 {ambulance.phone} · Location shared now</p>
+                          <p>{ambulance.latitude.toFixed(5)}, {ambulance.longitude.toFixed(5)}</p>
+                        </div>
+                        <a className="location-link" href={`https://www.google.com/maps/dir/?api=1&destination=${ambulance.latitude},${ambulance.longitude}`} target="_blank" rel="noopener noreferrer">Open ambulance location ↗</a>
+                      </article>
+                    ))}
+                  </div>
+                  <iframe
+                    className="ambulance-location-map"
+                    src={ambulanceMapUrl}
+                    title="Shared ambulance location map"
+                    loading="lazy"
+                    referrerPolicy="strict-origin-when-cross-origin"
+                  />
+                </div>
+              ) : (
+                <div className="ambulance-details-empty">No ambulance driver is sharing a location right now. Drivers can share their location from the Ambulance portal.</div>
+              )
+            )}
+          </section>
           <iframe
             className="hospital-map"
             src={hospitalMapUrl}
