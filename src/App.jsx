@@ -339,6 +339,7 @@ function App() {
   const [locationError, setLocationError] = useState('')
   const [isLocatingUser, setIsLocatingUser] = useState(false)
   const [showAmbulanceDetails, setShowAmbulanceDetails] = useState(false)
+  const [visibleAmbulancePhone, setVisibleAmbulancePhone] = useState('')
   const [currentUser, setCurrentUser] = useState(() => {
     const saved = localStorage.getItem('mediconnect_user')
     return saved ? JSON.parse(saved) : null
@@ -731,9 +732,18 @@ function App() {
                       <div className="closest-hospital-actions">
                         <a className="directions-button" href={`https://www.google.com/maps/dir/?api=1&origin=${userLocation.latitude},${userLocation.longitude}&destination=${hospital.latitude},${hospital.longitude}`} target="_blank" rel="noopener noreferrer">Directions</a>
                         {sharedAmbulance && (
-                          <a className="emergency-call-button" href={`tel:+91${sharedAmbulance.phone}`}>Call ambulance</a>
+                          <button type="button" className="emergency-call-button" onClick={() => setVisibleAmbulancePhone(sharedAmbulance.phone)}>
+                            Call ambulance
+                          </button>
                         )}
                       </div>
+                      {visibleAmbulancePhone === sharedAmbulance?.phone && (
+                        <div className="ambulance-number-reveal" role="status">
+                          <span>Registered ambulance number</span>
+                          <strong>+91 {sharedAmbulance.phone}</strong>
+                          <a href={`tel:+91${sharedAmbulance.phone}`}>Call now</a>
+                        </div>
+                      )}
                     </article>
                   )
                 })}
