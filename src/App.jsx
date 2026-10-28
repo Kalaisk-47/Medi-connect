@@ -35,6 +35,22 @@ const readAppointments = () => {
   }
 }
 
+const readAmbulanceDriver = () => {
+  try {
+    return JSON.parse(localStorage.getItem('mediconnect_ambulance_driver') || 'null')
+  } catch {
+    return null
+  }
+}
+
+const readSharedAmbulances = () => {
+  try {
+    return JSON.parse(localStorage.getItem('mediconnect_shared_ambulances') || '[]')
+  } catch {
+    return []
+  }
+}
+
 const openPrescriptionDatabase = () => new Promise((resolve, reject) => {
   if (!window.indexedDB) {
     reject(new Error('Prescription storage is not available in this browser.'))
@@ -295,6 +311,12 @@ function App() {
   const [adminEmail, setAdminEmail] = useState('')
   const [adminPassword, setAdminPassword] = useState('')
   const [adminLoginError, setAdminLoginError] = useState('')
+  const [ambulanceDriver, setAmbulanceDriver] = useState(readAmbulanceDriver)
+  const [ambulancePhone, setAmbulancePhone] = useState('')
+  const [ambulanceHospital, setAmbulanceHospital] = useState('')
+  const [ambulanceError, setAmbulanceError] = useState('')
+  const [sharedAmbulances, setSharedAmbulances] = useState(readSharedAmbulances)
+  const [isSharingLocation, setIsSharingLocation] = useState(() => readSharedAmbulances().length > 0)
   const [currentUser, setCurrentUser] = useState(() => {
     const saved = localStorage.getItem('mediconnect_user')
     return saved ? JSON.parse(saved) : null
@@ -454,6 +476,62 @@ function App() {
     setCurrentPage('home')
   }
 
+  const handleAmbulanceLogin = (event) => {
+    event.preventDefault()
+    const phone = ambulancePhone.replace(/\D/g, '')
+    if (phone.length < 10) {
+      setAmbulanceError('Enter a valid 10-digit phone number.')
+      return
+    }
+    if (!ambulanceHospital.trim()) {
+      setAmbulanceError('Enter the hospital you work for.')
+      return
+    }
+    const driver = { phone, hospital: ambulanceHospital.trim(), loggedInAt: new Date().toISOString() }
+    localStorage.setItem('mediconnect_ambulance_driver', JSON.stringify(driver))
+    setAmbulanceDriver(driver)
+    setAmbulancePhone('')
+    setAmbulanceHospital('')
+    setAmbulanceError('')
+  }
+
+  const handleShareLocation = () => {
+    if (!ambulanceDriver) return
+    if (!navigator.geolocation) {
+      setAmbulanceError('Location sharing is not supported by this browser.')
+      return
+    }
+    setAmbulanceError('')
+    navigator.geolocation.getCurrentPosition(
+      ({ coords }) => {
+        const shared = {
+          ...ambulanceDriver,
+          latitude: coords.latitude,
+          longitude: coords.longitude,
+          sharedAt: new Date().toISOString()
+        }
+        const nextAmbulances = [shared]
+        localStorage.setItem('mediconnect_shared_ambulances', JSON.stringify(nextAmbulances))
+        setSharedAmbulances(nextAmbulances)
+        setIsSharingLocation(true)
+      },
+      () => setAmbulanceError('Location permission was not granted. Please allow location access and try again.'),
+      { enableHighAccuracy: true, timeout: 10000 }
+    )
+  }
+
+  const handleStopSharingLocation = () => {
+    localStorage.removeItem('mediconnect_shared_ambulances')
+    setSharedAmbulances([])
+    setIsSharingLocation(false)
+  }
+
+  const handleAmbulanceLogout = () => {
+    handleStopSharingLocation()
+    localStorage.removeItem('mediconnect_ambulance_driver')
+    setAmbulanceDriver(null)
+  }
+
   const resetForm = () => {
     setSpecialty('')
     setDoctorId('')
@@ -493,6 +571,9 @@ function App() {
           <button type="button" className="nav-link-button" onClick={() => setCurrentPage(adminUser ? 'admin-dashboard' : 'admin-login')}>
             {adminUser ? 'Admin dashboard' : 'Admin'}
           </button>
+          <button type="button" className="nav-link-button ambulance-nav-link" onClick={() => setCurrentPage('ambulance')}>
+            Ambulance
+          </button>
         </nav>
         <div className="nav-actions">
           <button type="button" className="admin-mobile-link" onClick={() => setCurrentPage(adminUser ? 'admin-dashboard' : 'admin-login')}>
@@ -530,6 +611,81 @@ function App() {
             loading="lazy"
             referrerPolicy="strict-origin-when-cross-origin"
           />
+        </main>
+      ) : currentPage === 'ambulance' ? (
+        <main className="ambulance-page">
+          <section className="ambulance-hero">
+            <div>
+              <p className="booking-kicker">Emergency response network</p>
+              <h1>Ambulance driver portal</h1>
+              <p className="admin-description">Sign in with your phone number, add your hospital, and share your live location with nearby users.</p>
+            </div>
+            <div className="ambulance-hero-icon" aria-hidden="true">+</div>
+          </section>
+          {!ambulanceDriver ? (
+            <section className="ambulance-card ambulance-login-card">
+              <p className="ambulance-card-kicker">Driver access</p>
+              <h2>Sign in to share your ambulance</h2>
+              <form onSubmit={handleAmbulanceLogin}>
+                <label htmlFor="ambulancePhone">Phone number</label>
+                <input id="ambulancePhone" type="tel" inputMode="numeric" autoComplete="tel" placeholder="10-digit mobile number" required value={ambulancePhone} onChange={(event) => setAmbulancePhone(event.target.value)} />
+                <label htmlFor="ambulanceHospital">Hospital you work for</label>
+                <input id="ambulanceHospital" type="text" placeholder="e.g. PSG Hospitals" required value={ambulanceHospital} onChange={(event) => setAmbulanceHospital(event.target.value)} />
+                {ambulanceError && <p className="ambulance-error" role="alert">{ambulanceError}</p>}
+                <button type="submit" className="btn btn-primary">Continue as ambulance driver</button>
+              </form>
+              <p className="ambulance-note">Your phone number is used as your driver ID in this browser.</p>
+            </section>
+          ) : (
+            <section className="ambulance-dashboard-card">
+              <div className="ambulance-driver-heading">
+                <div>
+                  <p className="ambulance-card-kicker">Driver signed in</p>
+                  <h2>{ambulanceDriver.hospital}</h2>
+                  <p className="admin-description">Driver ID · +91 {ambulanceDriver.phone}</p>
+                </div>
+                <button type="button" className="auth-btn" onClick={handleAmbulanceLogout}>Sign out</button>
+              </div>
+              <div className={`location-status ${isSharingLocation ? 'location-status-active' : ''}`}>
+                <span className="location-status-dot" />
+                <div>
+                  <strong>{isSharingLocation ? 'Location is being shared' : 'Location sharing is off'}</strong>
+                  <p>{isSharingLocation ? 'Users can see this ambulance location on MediConnect.' : 'Share your current position so users can find help nearby.'}</p>
+                </div>
+              </div>
+              {ambulanceError && <p className="ambulance-error" role="alert">{ambulanceError}</p>}
+              {isSharingLocation ? (
+                <button type="button" className="btn btn-secondary" onClick={handleStopSharingLocation}>Stop sharing location</button>
+              ) : (
+                <button type="button" className="btn btn-primary" onClick={handleShareLocation}>Share my current location</button>
+              )}
+            </section>
+          )}
+          <section className="ambulance-card ambulance-user-panel">
+            <div className="ambulance-panel-heading">
+              <div>
+                <p className="ambulance-card-kicker">For patients and hospitals</p>
+                <h2>Available ambulances</h2>
+              </div>
+              <span className="live-badge"><span /> LIVE</span>
+            </div>
+            {sharedAmbulances.length ? (
+              <div className="shared-ambulance-list">
+                {sharedAmbulances.map((ambulance) => (
+                  <article className="shared-ambulance" key={ambulance.phone}>
+                    <div className="shared-ambulance-icon">+</div>
+                    <div>
+                      <strong>{ambulance.hospital} ambulance</strong>
+                      <p>Driver available · Location shared just now</p>
+                    </div>
+                    <a className="location-link" href={`https://www.google.com/maps?q=${ambulance.latitude},${ambulance.longitude}`} target="_blank" rel="noopener noreferrer">Open map ↗</a>
+                  </article>
+                ))}
+              </div>
+            ) : (
+              <div className="ambulance-empty-state"><span aria-hidden="true">⌖</span><p>No ambulance locations are being shared right now.</p></div>
+            )}
+          </section>
         </main>
       ) : currentPage === 'admin-login' ? (
         <main className="admin-page">

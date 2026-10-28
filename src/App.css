@@ -476,6 +476,91 @@ body {
 .admin-login-error { margin-top: 12px; color: var(--danger); font-size: 13px; }
 .admin-demo-note { margin-top: 20px; color: var(--muted); font-size: 11px; line-height: 1.5; }
 
+.ambulance-page {
+  width: min(100% - 48px, 920px);
+  min-height: calc(100vh - 76px);
+  margin: 0 auto;
+  padding: 64px 0 80px;
+}
+
+.ambulance-hero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 30px;
+  margin-bottom: 28px;
+}
+
+.ambulance-hero h1 {
+  margin-top: 8px;
+  color: var(--navy);
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: clamp(36px, 6vw, 58px);
+  font-weight: 500;
+  letter-spacing: -1.5px;
+}
+
+.ambulance-hero .admin-description { max-width: 580px; font-size: 15px; }
+.ambulance-hero-icon,
+.shared-ambulance-icon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  border-radius: 18px;
+  background: linear-gradient(135deg, var(--primary), var(--accent));
+  color: #fff;
+  font-size: 38px;
+  font-weight: 900;
+  box-shadow: 0 16px 30px rgba(2, 132, 199, 0.2);
+}
+.ambulance-hero-icon { width: 82px; height: 82px; }
+.ambulance-card,
+.ambulance-dashboard-card {
+  padding: 30px;
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.08);
+}
+.ambulance-login-card { max-width: 510px; }
+.ambulance-card-kicker { color: var(--primary); font-size: 11px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; }
+.ambulance-card h2,
+.ambulance-dashboard-card h2 { margin-top: 7px; color: var(--navy); font-size: 24px; letter-spacing: -0.5px; }
+.ambulance-card form { margin-top: 24px; }
+.ambulance-card label { display: block; margin: 15px 0 7px; color: var(--slate); font-size: 12px; font-weight: 750; }
+.ambulance-note { margin-top: 17px; color: var(--muted); font-size: 11px; line-height: 1.5; }
+.ambulance-error { margin-top: 12px; color: var(--danger); font-size: 13px; line-height: 1.45; }
+.ambulance-dashboard-card { margin-bottom: 22px; }
+.ambulance-driver-heading,
+.ambulance-panel-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; }
+.location-status {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  margin: 26px 0 16px;
+  padding: 16px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #f8fafc;
+}
+.location-status-active { border-color: #86efac; background: #f0fdf4; }
+.location-status-dot { width: 11px; height: 11px; flex: 0 0 auto; border-radius: 50%; background: #94a3b8; }
+.location-status-active .location-status-dot { background: #22c55e; box-shadow: 0 0 0 5px #dcfce7; }
+.location-status strong { color: var(--navy); font-size: 13px; }
+.location-status p { margin-top: 4px; color: var(--muted); font-size: 11px; }
+.ambulance-user-panel { margin-top: 22px; }
+.live-badge { display: inline-flex; align-items: center; gap: 7px; color: #15803d; font-size: 10px; font-weight: 900; letter-spacing: .8px; }
+.live-badge span { width: 7px; height: 7px; border-radius: 50%; background: #22c55e; }
+.shared-ambulance-list { display: grid; gap: 10px; margin-top: 22px; }
+.shared-ambulance { display: flex; align-items: center; gap: 13px; padding: 13px; border: 1px solid #dcfce7; border-radius: 12px; background: #f0fdf4; }
+.shared-ambulance-icon { width: 40px; height: 40px; border-radius: 10px; font-size: 21px; box-shadow: none; }
+.shared-ambulance strong { color: var(--navy); font-size: 13px; }
+.shared-ambulance p { margin-top: 4px; color: var(--muted); font-size: 11px; }
+.location-link { margin-left: auto; color: var(--primary-dark); font-size: 11px; font-weight: 800; text-decoration: none; white-space: nowrap; }
+.location-link:hover { text-decoration: underline; }
+.ambulance-empty-state { display: flex; align-items: center; gap: 12px; margin-top: 22px; padding: 20px; border: 1px dashed var(--border); border-radius: 12px; color: var(--muted); font-size: 12px; }
+.ambulance-empty-state span { color: var(--primary); font-size: 23px; }
+
 .admin-heading {
   display: flex;
   align-items: flex-end;
@@ -1011,6 +1096,14 @@ select:disabled, input:disabled {
   .booking-layout { grid-template-columns: 1fr; gap: 0; }
   .prescriptions-panel { position: static; margin: 20px 0 28px; }
   .admin-page { width: min(100% - 28px, 560px); padding: 42px 0; }
+  .ambulance-page { width: min(100% - 28px, 560px); padding: 42px 0 56px; }
+  .ambulance-hero { align-items: flex-start; }
+  .ambulance-hero h1 { font-size: 38px; }
+  .ambulance-hero-icon { width: 58px; height: 58px; font-size: 28px; }
+  .ambulance-card, .ambulance-dashboard-card { padding: 22px 18px; }
+  .ambulance-driver-heading, .ambulance-panel-heading { align-items: flex-start; flex-direction: column; }
+  .shared-ambulance { align-items: flex-start; flex-wrap: wrap; }
+  .location-link { margin-left: 53px; }
   .admin-login-panel { margin: 10px auto; padding: 26px 20px; }
   .admin-login-panel h1, .admin-heading h1 { font-size: 27px; }
   .admin-heading { align-items: flex-start; flex-direction: column; margin-bottom: 20px; }
