@@ -27,12 +27,66 @@ const TOTAL_SEATS = 10
 const ADMIN_CREDENTIALS = { email: 'admin@mediconnect.com', password: 'Admin@123' }
 const PRESCRIPTION_DB_NAME = 'mediconnect-prescriptions'
 const PRESCRIPTION_STORE_NAME = 'attachments'
-const readAppointments = () => {
+const hospitalBranches = [
+  { name: 'PSG Hospitals', location: 'Peelamedu, Coimbatore' },
+  { name: 'Sri Ramakrishna Hospital', location: 'Siddhapudur, Coimbatore' },
+  { name: 'KMCH', location: 'Avinashi Road, Coimbatore' },
+  { name: 'Ganga Hospital', location: 'Swarnambika Layout, Coimbatore' }
+]
+
+const hospitalStorageKey = (hospitalName) => `mediconnect_appointments_${normalizeHospitalName(hospitalName)}`
+
+const readHospitalAppointments = (hospitalName) => {
+  if (!hospitalName) return []
   try {
-    return JSON.parse(localStorage.getItem('mediconnect_appointments') || '[]')
+    return JSON.parse(localStorage.getItem(hospitalStorageKey(hospitalName)) || '[]')
   } catch {
     return []
   }
+}
+
+const readAmbulanceDriver = () => {
+  try {
+    return JSON.parse(localStorage.getItem('mediconnect_ambulance_driver') || 'null')
+  } catch {
+    return null
+  }
+}
+
+const readSharedAmbulances = () => {
+  try {
+    return JSON.parse(localStorage.getItem('mediconnect_shared_ambulances') || '[]')
+  } catch {
+    return []
+  }
+}
+
+const readAmbulanceRequests = () => {
+  try {
+    return JSON.parse(localStorage.getItem('mediconnect_ambulance_requests') || '[]')
+  } catch {
+    return []
+  }
+}
+
+const nearbyHospitals = [
+  { name: 'PSG Hospitals', location: 'Peelamedu, Coimbatore', latitude: 11.0236, longitude: 76.9345 },
+  { name: 'Sri Ramakrishna Hospital', location: 'Siddhapudur, Coimbatore', latitude: 11.0183, longitude: 76.9714 },
+  { name: 'KMCH', location: 'Avinashi Road, Coimbatore', latitude: 11.051, longitude: 76.9947 },
+  { name: 'Ganga Hospital', location: 'Swarnambika Layout, Coimbatore', latitude: 11.0074, longitude: 76.9504 }
+]
+
+const normalizeHospitalName = (name) => name.toLowerCase().replace(/[^a-z0-9]/g, '')
+
+const distanceBetweenCoordinates = (firstLatitude, firstLongitude, secondLatitude, secondLongitude) => {
+  const earthRadiusKm = 6371
+  const latitudeDelta = (secondLatitude - firstLatitude) * Math.PI / 180
+  const longitudeDelta = (secondLongitude - firstLongitude) * Math.PI / 180
+  const firstLatitudeRadians = firstLatitude * Math.PI / 180
+  const secondLatitudeRadians = secondLatitude * Math.PI / 180
+  const haversine = Math.sin(latitudeDelta / 2) ** 2
+    + Math.sin(longitudeDelta / 2) ** 2 * Math.cos(firstLatitudeRadians) * Math.cos(secondLatitudeRadians)
+  return earthRadiusKm * 2 * Math.atan2(Math.sqrt(haversine), Math.sqrt(1 - haversine))
 }
 
 const openPrescriptionDatabase = () => new Promise((resolve, reject) => {
@@ -272,6 +326,7 @@ function PrescriptionAttachments() {
 }
 
 function App() {
+  const [hospitalName, setHospitalName] = useState('')
   const [specialty, setSpecialty] = useState('')
   const [doctorId, setDoctorId] = useState('')
   const [patientType, setPatientType] = useState('Myself')
@@ -290,20 +345,32 @@ function App() {
   const [currentPage, setCurrentPage] = useState('home')
   const [isAuthOpen, setIsAuthOpen] = useState(false)
   const [loginInput, setLoginInput] = useState('')
-<<<<<<< Updated upstream
-  const [appointments, setAppointments] = useState(readAppointments)
+  const [appointments, setAppointments] = useState(() => readHospitalAppointments(localStorage.getItem('mediconnect_admin_hospital') || ''))
   const [adminUser, setAdminUser] = useState(() => localStorage.getItem('mediconnect_admin') === 'true')
+  const [adminHospital, setAdminHospital] = useState(() => localStorage.getItem('mediconnect_admin_hospital') || '')
   const [adminEmail, setAdminEmail] = useState('')
   const [adminPassword, setAdminPassword] = useState('')
   const [adminLoginError, setAdminLoginError] = useState('')
-=======
   const [loginPassword, setLoginPassword] = useState('')
   const [loginError, setLoginError] = useState('')
->>>>>>> Stashed changes
+  const [ambulanceDriver, setAmbulanceDriver] = useState(readAmbulanceDriver)
+  const [ambulancePhone, setAmbulancePhone] = useState('')
+  const [ambulanceHospital, setAmbulanceHospital] = useState('')
+  const [ambulanceError, setAmbulanceError] = useState('')
+  const [sharedAmbulances, setSharedAmbulances] = useState(readSharedAmbulances)
+  const [ambulanceRequests, setAmbulanceRequests] = useState(readAmbulanceRequests)
+  const [isSharingLocation, setIsSharingLocation] = useState(() => readSharedAmbulances().length > 0)
+  const [userLocation, setUserLocation] = useState(null)
+  const [locationError, setLocationError] = useState('')
+  const [isLocatingUser, setIsLocatingUser] = useState(false)
+  const [showAmbulanceDetails, setShowAmbulanceDetails] = useState(false)
+  const [visibleAmbulancePhone, setVisibleAmbulancePhone] = useState('')
   const [currentUser, setCurrentUser] = useState(() => {
     const saved = localStorage.getItem('mediconnect_user')
     return saved ? JSON.parse(saved) : null
   })
+  const patientLocationWatchRef = useRef(null)
+  const activeAmbulanceRequestIdRef = useRef(null)
 
   useEffect(() => {
     const minDate = getLocalDateString()
@@ -311,24 +378,71 @@ function App() {
     if (dateInput) dateInput.min = minDate
   }, [])
 
+  useEffect(() => {
+    const syncAmbulanceData = () => {
+      setSharedAmbulances(readSharedAmbulances())
+      const nextRequests = readAmbulanceRequests()
+      setAmbulanceRequests(nextRequests)
+      const activeRequest = nextRequests.find((request) => request.id === activeAmbulanceRequestIdRef.current)
+      if (activeAmbulanceRequestIdRef.current && (!activeRequest || activeRequest.status === 'completed')) {
+        if (patientLocationWatchRef.current !== null && navigator.geolocation) {
+          navigator.geolocation.clearWatch(patientLocationWatchRef.current)
+        }
+        patientLocationWatchRef.current = null
+        activeAmbulanceRequestIdRef.current = null
+      }
+    }
+    window.addEventListener('storage', syncAmbulanceData)
+    const refreshTimer = window.setInterval(syncAmbulanceData, 3000)
+    return () => {
+      window.removeEventListener('storage', syncAmbulanceData)
+      window.clearInterval(refreshTimer)
+    }
+  }, [])
+
+  useEffect(() => () => {
+    if (patientLocationWatchRef.current !== null && navigator.geolocation) {
+      navigator.geolocation.clearWatch(patientLocationWatchRef.current)
+    }
+  }, [])
+
   const selectedDoctor = useMemo(
-    () => (specialty ? doctors[specialty].find((d) => d.id === doctorId) : null),
-    [specialty, doctorId]
+    () => (specialty ? doctors[specialty].find((d) => d.id === doctorId && d.hospital.name === hospitalName) : null),
+    [specialty, doctorId, hospitalName]
   )
 
   const bookedSeats = useMemo(() => {
     if (!selectedDoctor || !date || !time) return []
     const storedSeats = appointments
-      .filter((appointment) => appointment.doctorId === selectedDoctor.id && appointment.date === date && appointment.time === time)
+      .filter((appointment) => appointment.hospital === hospitalName && appointment.doctorId === selectedDoctor.id && appointment.date === date && appointment.time === time)
       .map((appointment) => appointment.seat)
     return [...new Set([...getDeterministicBookedSeats(selectedDoctor.id, date, time), ...storedSeats])]
-  }, [selectedDoctor, date, time, appointments])
+  }, [selectedDoctor, hospitalName, date, time, appointments])
 
   const availableSeatCount = TOTAL_SEATS - bookedSeats.length
   const canSubmitAppointment = paymentMethod === 'hospital' || (paymentMethod === 'online' && paymentVerified)
 
   const handleSymptomMatch = (specKey) => {
+    if (!hospitalName) {
+      alert('Please select a hospital branch first.')
+      return
+    }
     setSpecialty(specKey)
+    setDoctorId('')
+    setDate('')
+    setTime('')
+    setSeat(null)
+    setShowPayment(false)
+    setPaymentMethod('')
+    setUtr('')
+    setPaymentVerified(false)
+  }
+
+  const handleHospitalChange = (event) => {
+    const nextHospitalName = event.target.value
+    setHospitalName(nextHospitalName)
+    setAppointments(readHospitalAppointments(nextHospitalName))
+    setSpecialty('')
     setDoctorId('')
     setDate('')
     setTime('')
@@ -448,7 +562,7 @@ function App() {
       createdAt: new Date().toISOString()
     }
     const nextAppointments = [...appointments, appointment]
-    localStorage.setItem('mediconnect_appointments', JSON.stringify(nextAppointments))
+    localStorage.setItem(hospitalStorageKey(hospitalName), JSON.stringify(nextAppointments))
     setAppointments(nextAppointments)
     alert(`🎉 Token #${seat} Confirmed!\n\nPatient: ${patientType}\nDoctor: ${selectedDoctor.name}\nHospital: ${selectedDoctor.hospital.name}\nDate: ${date} at ${time}\n\nSMS alert sent to your registered mobile.`)
     resetForm()
@@ -456,12 +570,16 @@ function App() {
 
   const handleAdminLogin = (event) => {
     event.preventDefault()
-    if (adminEmail.trim().toLowerCase() !== ADMIN_CREDENTIALS.email || adminPassword !== ADMIN_CREDENTIALS.password) {
-      setAdminLoginError('The email or password is incorrect.')
+    const matchedHospital = hospitalBranches.find((hospital) => normalizeHospitalName(hospital.name) === normalizeHospitalName(adminEmail.trim()))
+    if (!matchedHospital || adminPassword !== ADMIN_CREDENTIALS.password) {
+      setAdminLoginError('Enter a hospital name from the booking list and the correct admin password.')
       return
     }
     localStorage.setItem('mediconnect_admin', 'true')
+    localStorage.setItem('mediconnect_admin_hospital', matchedHospital.name)
     setAdminUser(true)
+    setAdminHospital(matchedHospital.name)
+    setAppointments(readHospitalAppointments(matchedHospital.name))
     setAdminLoginError('')
     setAdminEmail('')
     setAdminPassword('')
@@ -470,8 +588,153 @@ function App() {
 
   const handleAdminLogout = () => {
     localStorage.removeItem('mediconnect_admin')
+    localStorage.removeItem('mediconnect_admin_hospital')
     setAdminUser(false)
+    setAdminHospital('')
+    setAppointments([])
     setCurrentPage('home')
+  }
+
+  const handleAmbulanceLogin = (event) => {
+    event.preventDefault()
+    const phone = ambulancePhone.replace(/\D/g, '')
+    if (phone.length < 10) {
+      setAmbulanceError('Enter a valid 10-digit phone number.')
+      return
+    }
+    if (!ambulanceHospital.trim()) {
+      setAmbulanceError('Enter the hospital you work for.')
+      return
+    }
+    const driver = { phone, hospital: ambulanceHospital.trim(), loggedInAt: new Date().toISOString() }
+    localStorage.setItem('mediconnect_ambulance_driver', JSON.stringify(driver))
+    setAmbulanceDriver(driver)
+    setAmbulancePhone('')
+    setAmbulanceHospital('')
+    setAmbulanceError('')
+  }
+
+  const handleShareLocation = () => {
+    if (!ambulanceDriver) return
+    if (!navigator.geolocation) {
+      setAmbulanceError('Location sharing is not supported by this browser.')
+      return
+    }
+    setAmbulanceError('')
+    navigator.geolocation.getCurrentPosition(
+      ({ coords }) => {
+        const shared = {
+          ...ambulanceDriver,
+          latitude: coords.latitude,
+          longitude: coords.longitude,
+          sharedAt: new Date().toISOString()
+        }
+        const nextAmbulances = [shared]
+        localStorage.setItem('mediconnect_shared_ambulances', JSON.stringify(nextAmbulances))
+        setSharedAmbulances(nextAmbulances)
+        setIsSharingLocation(true)
+      },
+      () => setAmbulanceError('Location permission was not granted. Please allow location access and try again.'),
+      { enableHighAccuracy: true, timeout: 10000 }
+    )
+  }
+
+  const handleStopSharingLocation = () => {
+    localStorage.removeItem('mediconnect_shared_ambulances')
+    setSharedAmbulances([])
+    setIsSharingLocation(false)
+  }
+
+  const updateAmbulanceRequestLocation = (requestId, latitude, longitude) => {
+    const requests = readAmbulanceRequests()
+    const nextRequests = requests.map((request) => request.id === requestId
+      ? { ...request, latitude, longitude, updatedAt: new Date().toISOString() }
+      : request)
+    localStorage.setItem('mediconnect_ambulance_requests', JSON.stringify(nextRequests))
+    setAmbulanceRequests(nextRequests)
+  }
+
+  const handleCallAmbulance = (ambulance) => {
+    if (!navigator.geolocation) {
+      setLocationError('Location access is not supported by this browser. Please call the ambulance directly.')
+      setVisibleAmbulancePhone(ambulance.phone)
+      return
+    }
+    setLocationError('')
+    setVisibleAmbulancePhone(ambulance.phone)
+    navigator.geolocation.getCurrentPosition(
+      ({ coords }) => {
+        const request = {
+          id: `${Date.now()}-${ambulance.phone}`,
+          ambulancePhone: ambulance.phone,
+          hospital: ambulance.hospital,
+          patientName: currentUser?.name || patientName.trim() || 'Patient',
+          patientPhone: currentUser?.email || 'Not provided',
+          latitude: coords.latitude,
+          longitude: coords.longitude,
+          status: 'pending',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        }
+        const nextRequests = [...readAmbulanceRequests(), request]
+        localStorage.setItem('mediconnect_ambulance_requests', JSON.stringify(nextRequests))
+        setAmbulanceRequests(nextRequests)
+        setUserLocation({ latitude: coords.latitude, longitude: coords.longitude })
+        activeAmbulanceRequestIdRef.current = request.id
+        if (patientLocationWatchRef.current === null && navigator.geolocation.watchPosition) {
+          patientLocationWatchRef.current = navigator.geolocation.watchPosition(
+            ({ coords: updatedCoords }) => {
+              setUserLocation({ latitude: updatedCoords.latitude, longitude: updatedCoords.longitude })
+              updateAmbulanceRequestLocation(request.id, updatedCoords.latitude, updatedCoords.longitude)
+            },
+            () => setLocationError('Live tracking was interrupted. The driver can still use your last shared location.'),
+            { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 }
+          )
+        }
+      },
+      () => setLocationError('Location permission was not granted. Please allow access so the driver can find you, then try again.'),
+      { enableHighAccuracy: true, timeout: 10000 }
+    )
+  }
+
+  const handleAmbulanceRequestStatus = (requestId, status) => {
+    const nextRequests = readAmbulanceRequests().map((request) => request.id === requestId
+      ? { ...request, status, updatedAt: new Date().toISOString() }
+      : request)
+    localStorage.setItem('mediconnect_ambulance_requests', JSON.stringify(nextRequests))
+    setAmbulanceRequests(nextRequests)
+  }
+
+  const handleAmbulanceLogout = () => {
+    handleStopSharingLocation()
+    localStorage.removeItem('mediconnect_ambulance_driver')
+    setAmbulanceDriver(null)
+  }
+
+  const handleFindNearestHospital = () => {
+    if (!navigator.geolocation) {
+      setLocationError('Location access is not supported by this browser. Please open MediConnect in a current browser.')
+      return
+    }
+    setLocationError('')
+    setIsLocatingUser(true)
+    navigator.geolocation.getCurrentPosition(
+      ({ coords }) => {
+        setUserLocation({ latitude: coords.latitude, longitude: coords.longitude })
+        setIsLocatingUser(false)
+      },
+      (error) => {
+        if (error.code === error.PERMISSION_DENIED) {
+          setLocationError('Location access is off. Turn on Location Services in your phone or computer settings, allow this site in your browser, then try again.')
+        } else if (error.code === error.TIMEOUT) {
+          setLocationError('We could not get your location in time. Check that Location Services are on and try again.')
+        } else {
+          setLocationError('We could not determine your location. Turn on Location Services and try again.')
+        }
+        setIsLocatingUser(false)
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    )
   }
 
   const resetForm = () => {
@@ -493,10 +756,36 @@ function App() {
     setLoginError('')
   }
 
-  const doctorList = specialty ? doctors[specialty] : []
+  const doctorList = specialty ? doctors[specialty].filter((doctor) => doctor.hospital.name === hospitalName) : []
   const dayOfWeek = date ? new Date(`${date}T00:00:00`).getDay() : null
   const isToday = date === getLocalDateString()
-  const qrImage = '/payment-qr.svg'
+  const qrImage = `${import.meta.env.BASE_URL}payment-qr.svg`
+  const nearestHospital = userLocation
+    ? nearbyHospitals
+      .map((hospital) => ({
+        ...hospital,
+        distance: distanceBetweenCoordinates(userLocation.latitude, userLocation.longitude, hospital.latitude, hospital.longitude)
+      }))
+      .sort((first, second) => first.distance - second.distance)[0]
+    : null
+  const closestHospitals = userLocation
+    ? nearbyHospitals
+      .map((hospital) => ({
+        ...hospital,
+        distance: distanceBetweenCoordinates(userLocation.latitude, userLocation.longitude, hospital.latitude, hospital.longitude)
+      }))
+      .sort((first, second) => first.distance - second.distance)
+      .slice(0, 3)
+    : []
+  const hospitalMapUrl = userLocation
+    ? `https://www.google.com/maps?q=hospitals+near+${userLocation.latitude},${userLocation.longitude}&output=embed`
+    : 'https://www.google.com/maps/embed?pb=!1m12!1m8!1m3!1d31330.61570071956!2d76.9745064!3d11.0140768!3m2!1i1024!2i768!4f13.1!2m1!1shospitals%20in%20coimbatore!5e0!3m2!1sen!2sin!4v1792769761565!5m2!1sen!2sin'
+  const ambulanceMapUrl = sharedAmbulances.length
+    ? `https://www.google.com/maps?q=${sharedAmbulances[0].latitude},${sharedAmbulances[0].longitude}&output=embed`
+    : ''
+  const driverRequests = ambulanceDriver
+    ? ambulanceRequests.filter((request) => normalizeHospitalName(request.hospital) === normalizeHospitalName(ambulanceDriver.hospital) && request.status !== 'completed')
+    : []
 
   return (
     <>
@@ -515,10 +804,16 @@ function App() {
           <button type="button" className="nav-link-button" onClick={() => setCurrentPage(adminUser ? 'admin-dashboard' : 'admin-login')}>
             {adminUser ? 'Admin dashboard' : 'Admin'}
           </button>
+          <button type="button" className="nav-link-button ambulance-nav-link" onClick={() => setCurrentPage('ambulance')}>
+            Ambulance
+          </button>
         </nav>
         <div className="nav-actions">
           <button type="button" className="admin-mobile-link" onClick={() => setCurrentPage(adminUser ? 'admin-dashboard' : 'admin-login')}>
             {adminUser ? 'Admin' : 'Admin login'}
+          </button>
+          <button type="button" className="ambulance-mobile-link" onClick={() => setCurrentPage('ambulance')}>
+            Ambulance
           </button>
           <div id="userProfile" className="user-pill" style={{ display: currentUser ? 'inline-flex' : 'none' }}>
             <span>👤</span>
@@ -540,18 +835,277 @@ function App() {
           <div className="map-heading">
             <div>
               <p className="booking-kicker">Find care nearby</p>
-              <h1>Hospitals in Coimbatore</h1>
+              <h1>Find the nearest hospital</h1>
+              <p className="map-description">Share your location to see hospitals near you and get directions faster.</p>
             </div>
             <button type="button" className="map-back-button" onClick={() => setCurrentPage('home')}>Back to MediConnect</button>
           </div>
+          <section className="location-finder-card" aria-label="Find nearest hospital">
+            <div className="location-finder-copy">
+              <span className="location-pin-icon" aria-hidden="true">⌖</span>
+              <div>
+                <strong>{nearestHospital ? 'Your nearest hospital' : 'Use your location'}</strong>
+                <p>{nearestHospital ? `${nearestHospital.name} is approximately ${nearestHospital.distance.toFixed(1)} km away.` : 'Turn on Location Services, allow browser access, and share your current location.'}</p>
+              </div>
+            </div>
+            <button type="button" className="location-share-button" onClick={handleFindNearestHospital} disabled={isLocatingUser}>
+              {isLocatingUser ? 'Finding hospitals…' : userLocation ? 'Update my location' : 'Share my location'}
+            </button>
+          </section>
+          {!userLocation && !locationError && (
+            <ol className="location-steps">
+              <li><strong>Turn on Location</strong> in your phone or computer settings.</li>
+              <li><strong>Allow location access</strong> when your browser asks.</li>
+              <li>Select <strong>Share my location</strong> to find the nearest hospital.</li>
+            </ol>
+          )}
+          {locationError && <p className="location-error" role="alert">{locationError}</p>}
+          {nearestHospital && (
+            <section className="nearest-hospital-card" aria-label="Nearest hospital">
+              <div>
+                <p className="booking-kicker">Recommended for you</p>
+                <h2>{nearestHospital.name}</h2>
+                <p>{nearestHospital.location} · {nearestHospital.distance.toFixed(1)} km away</p>
+              </div>
+              <a className="directions-button" href={`https://www.google.com/maps/dir/?api=1&origin=${userLocation.latitude},${userLocation.longitude}&destination=${nearestHospital.latitude},${nearestHospital.longitude}`} target="_blank" rel="noopener noreferrer">Get directions ↗</a>
+            </section>
+          )}
+          <section className="closest-hospitals-card" aria-label="Three closest hospitals">
+            <div className="closest-hospitals-heading">
+              <div>
+                <p className="booking-kicker">Emergency care shortlist</p>
+                <h2>Three closest hospitals</h2>
+                <p>Hospitals are ranked from your shared live location.</p>
+              </div>
+              <span className="hospital-count-badge">{closestHospitals.length || 0} nearby</span>
+            </div>
+            {closestHospitals.length ? (
+              <div className="closest-hospital-list">
+                {closestHospitals.map((hospital, index) => {
+                  const sharedAmbulance = sharedAmbulances.find((ambulance) => normalizeHospitalName(ambulance.hospital) === normalizeHospitalName(hospital.name))
+                  return (
+                    <article className="closest-hospital-item" key={hospital.name}>
+                      <span className="hospital-rank">{index + 1}</span>
+                      <div className="closest-hospital-info">
+                        <strong>{hospital.name}</strong>
+                        <p>{hospital.location} · {hospital.distance.toFixed(1)} km away</p>
+                        <span className={sharedAmbulance ? 'ambulance-availability available' : 'ambulance-availability'}>
+                          {sharedAmbulance ? 'Ambulance available now' : 'No shared ambulance currently'}
+                        </span>
+                      </div>
+                      <div className="closest-hospital-actions">
+                        <a className="directions-button" href={`https://www.google.com/maps/dir/?api=1&origin=${userLocation.latitude},${userLocation.longitude}&destination=${hospital.latitude},${hospital.longitude}`} target="_blank" rel="noopener noreferrer">Directions</a>
+                        {sharedAmbulance && (
+                          <button type="button" className="emergency-call-button" onClick={() => handleCallAmbulance(sharedAmbulance)}>
+                            Call ambulance
+                          </button>
+                        )}
+                      </div>
+                      {visibleAmbulancePhone === sharedAmbulance?.phone && (
+                        <div className="ambulance-number-reveal" role="status">
+                          <span>Registered ambulance number</span>
+                          <strong>+91 {sharedAmbulance.phone}</strong>
+                          {ambulanceRequests.some((request) => request.ambulancePhone === sharedAmbulance.phone && request.status !== 'completed') && (
+                            <small className="ambulance-request-status">Your location is shared with this driver. Live tracking is active.</small>
+                          )}
+                          <a href={`tel:+91${sharedAmbulance.phone}`}>Call now</a>
+                        </div>
+                      )}
+                    </article>
+                  )
+                })}
+              </div>
+            ) : (
+              <div className="closest-hospitals-empty">Share your location above to see the three closest hospitals and emergency ambulance actions.</div>
+            )}
+          </section>
+          <section className="ambulance-nearby-card" aria-label="Ambulance details near hospitals">
+            <div className="ambulance-nearby-heading">
+              <div>
+                <p className="booking-kicker">Emergency support</p>
+                <h2>Ambulances near hospitals</h2>
+                <p>See available ambulance details and the location shared by a driver.</p>
+              </div>
+              <button type="button" className="ambulance-details-button" onClick={() => setShowAmbulanceDetails((visible) => !visible)}>
+                {showAmbulanceDetails ? 'Hide ambulance details' : 'View ambulance details'}
+              </button>
+            </div>
+            {showAmbulanceDetails && (
+              sharedAmbulances.length ? (
+                <div className="ambulance-details-content">
+                  <div className="shared-ambulance-list">
+                    {sharedAmbulances.map((ambulance) => (
+                      <article className="shared-ambulance" key={ambulance.phone}>
+                        <div className="shared-ambulance-icon">+</div>
+                        <div>
+                          <strong>{ambulance.hospital} ambulance</strong>
+                          <p>Driver ID · +91 {ambulance.phone} · Location shared now</p>
+                          <p>{ambulance.latitude.toFixed(5)}, {ambulance.longitude.toFixed(5)}</p>
+                        </div>
+                        <a className="location-link" href={`https://www.google.com/maps/dir/?api=1&destination=${ambulance.latitude},${ambulance.longitude}`} target="_blank" rel="noopener noreferrer">Open ambulance location ↗</a>
+                      </article>
+                    ))}
+                  </div>
+                  <iframe
+                    className="ambulance-location-map"
+                    src={ambulanceMapUrl}
+                    title="Shared ambulance location map"
+                    loading="lazy"
+                    referrerPolicy="strict-origin-when-cross-origin"
+                  />
+                </div>
+              ) : (
+                <div className="ambulance-details-empty">No ambulance driver is sharing a location right now. Drivers can share their location from the Ambulance portal.</div>
+              )
+            )}
+          </section>
           <iframe
             className="hospital-map"
-            src="https://www.google.com/maps/embed?pb=!1m12!1m8!1m3!1d31330.61570071956!2d76.9745064!3d11.0140768!3m2!1i1024!2i768!4f13.1!2m1!1shospitals%20in%20coimbatore!5e0!3m2!1sen!2sin!4v1792769761565!5m2!1sen!2sin"
-            title="Hospitals in Coimbatore on Google Maps"
+            src={hospitalMapUrl}
+            title={userLocation ? 'Hospitals near your location' : 'Hospitals in Coimbatore on Google Maps'}
             allowFullScreen
             loading="lazy"
             referrerPolicy="strict-origin-when-cross-origin"
           />
+        </main>
+      ) : currentPage === 'ambulance' ? (
+        <main className="ambulance-page">
+          <section className="ambulance-hero">
+            <div>
+              <p className="booking-kicker">Emergency response network</p>
+              <h1>Ambulance driver portal</h1>
+              <p className="admin-description">Sign in with your phone number, add your hospital, and share your live location with nearby users.</p>
+            </div>
+            <div className="ambulance-hero-icon" aria-hidden="true">+</div>
+          </section>
+          {!ambulanceDriver ? (
+            <section className="ambulance-card ambulance-login-card">
+              <p className="ambulance-card-kicker">Driver access</p>
+              <h2>Sign in to share your ambulance</h2>
+              <form onSubmit={handleAmbulanceLogin}>
+                <label htmlFor="ambulancePhone">Phone number</label>
+                <input id="ambulancePhone" type="tel" inputMode="numeric" autoComplete="tel" placeholder="10-digit mobile number" required value={ambulancePhone} onChange={(event) => setAmbulancePhone(event.target.value)} />
+                <label htmlFor="ambulanceHospital">Hospital you work for</label>
+                <input id="ambulanceHospital" type="text" placeholder="e.g. PSG Hospitals" required value={ambulanceHospital} onChange={(event) => setAmbulanceHospital(event.target.value)} />
+                {ambulanceError && <p className="ambulance-error" role="alert">{ambulanceError}</p>}
+                <button type="submit" className="btn btn-primary">Continue as ambulance driver</button>
+              </form>
+              <p className="ambulance-note">Your phone number is used as your driver ID in this browser.</p>
+            </section>
+          ) : (
+            <section className="ambulance-dashboard-card">
+              <div className="ambulance-driver-heading">
+                <div>
+                  <p className="ambulance-card-kicker">Driver signed in</p>
+                  <h2>{ambulanceDriver.hospital}</h2>
+                  <p className="admin-description">Driver ID · +91 {ambulanceDriver.phone}</p>
+                </div>
+                <button type="button" className="auth-btn" onClick={handleAmbulanceLogout}>Sign out</button>
+              </div>
+              <div className={`location-status ${isSharingLocation ? 'location-status-active' : ''}`}>
+                <span className="location-status-dot" />
+                <div>
+                  <strong>{isSharingLocation ? 'Location is being shared' : 'Location sharing is off'}</strong>
+                  <p>{isSharingLocation ? 'Users can see this ambulance location on MediConnect.' : 'Share your current position so users can find help nearby.'}</p>
+                </div>
+              </div>
+              {ambulanceError && <p className="ambulance-error" role="alert">{ambulanceError}</p>}
+              {isSharingLocation ? (
+                <button type="button" className="btn btn-secondary" onClick={handleStopSharingLocation}>Stop sharing location</button>
+              ) : (
+                <button type="button" className="btn btn-primary" onClick={handleShareLocation}>Share my current location</button>
+              )}
+              <section className="driver-request-panel" aria-label="Patient ambulance requests">
+                <div className="ambulance-panel-heading">
+                  <div>
+                    <p className="ambulance-card-kicker">Incoming requests</p>
+                    <h2>{driverRequests.length ? `${driverRequests.length} patient${driverRequests.length === 1 ? '' : 's'} need help` : 'No active patient requests'}</h2>
+                  </div>
+                  <span className="live-badge"><span /> AUTO-REFRESH</span>
+                </div>
+                {driverRequests.length ? (
+                  <div className="driver-request-list">
+                    {driverRequests.map((request) => (
+                      <article className="driver-request" key={request.id}>
+                        <div>
+                          <strong>{request.patientName}</strong>
+                          <p>{request.patientPhone} · {request.status === 'accepted' ? 'Accepted' : 'Waiting for response'}</p>
+                          <p className="request-coordinates">Live location: {request.latitude.toFixed(5)}, {request.longitude.toFixed(5)}</p>
+                          <small>Updated {new Date(request.updatedAt).toLocaleTimeString()}</small>
+                        </div>
+                        <div className="driver-request-actions">
+                          <a className="location-link" href={`https://www.google.com/maps/dir/?api=1&destination=${request.latitude},${request.longitude}`} target="_blank" rel="noopener noreferrer">Navigate ↗</a>
+                          {request.status !== 'accepted' && (
+                            <button type="button" className="btn btn-primary" onClick={() => handleAmbulanceRequestStatus(request.id, 'accepted')}>Accept request</button>
+                          )}
+                          <button type="button" className="btn btn-secondary" onClick={() => handleAmbulanceRequestStatus(request.id, 'completed')}>Complete</button>
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="ambulance-details-empty">Patient requests for {ambulanceDriver.hospital} will appear here with a live location.</p>
+                )}
+              </section>
+            </section>
+          )}
+          <section className="ambulance-card ambulance-user-panel">
+            <div className="ambulance-panel-heading">
+              <div>
+                <p className="ambulance-card-kicker">For patients and hospitals</p>
+                <h2>Available ambulances</h2>
+              </div>
+              <span className="live-badge"><span /> LIVE</span>
+            </div>
+            {sharedAmbulances.length ? (
+              <div className="shared-ambulance-list">
+                {sharedAmbulances.map((ambulance) => {
+                  const patientRequest = ambulanceRequests.find((request) => request.ambulancePhone === ambulance.phone && request.status !== 'completed')
+                  const patientMapUrl = patientRequest
+                    ? `https://www.google.com/maps?q=${patientRequest.latitude},${patientRequest.longitude}&output=embed`
+                    : ''
+                  return (
+                    <article className={`shared-ambulance ${patientRequest ? 'shared-ambulance-tracking' : ''}`} key={ambulance.phone}>
+                      {patientRequest ? (
+                        <>
+                          <div className="shared-ambulance-tracking-heading">
+                            <div className="shared-ambulance-icon">+</div>
+                            <div>
+                              <strong>Patient location shared</strong>
+                              <p>{patientRequest.patientName} · Live location updates enabled</p>
+                            </div>
+                            <span className="live-badge"><span /> TRACKING</span>
+                          </div>
+                          <iframe
+                            className="patient-location-map"
+                            src={patientMapUrl}
+                            title={`Live location for ${patientRequest.patientName}`}
+                            loading="lazy"
+                            referrerPolicy="strict-origin-when-cross-origin"
+                          />
+                          <div className="shared-ambulance-location-footer">
+                            <span>{patientRequest.latitude.toFixed(5)}, {patientRequest.longitude.toFixed(5)}</span>
+                            <a className="location-link" href={`https://www.google.com/maps/dir/?api=1&destination=${patientRequest.latitude},${patientRequest.longitude}`} target="_blank" rel="noopener noreferrer">Navigate to patient ↗</a>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <div className="shared-ambulance-icon">+</div>
+                          <div>
+                            <strong>{ambulance.hospital} ambulance</strong>
+                            <p>Driver available · Location shared just now</p>
+                          </div>
+                          <a className="location-link" href={`https://www.google.com/maps?q=${ambulance.latitude},${ambulance.longitude}`} target="_blank" rel="noopener noreferrer">Open map ↗</a>
+                        </>
+                      )}
+                    </article>
+                  )
+                })}
+              </div>
+            ) : (
+              <div className="ambulance-empty-state"><span aria-hidden="true">⌖</span><p>No ambulance locations are being shared right now.</p></div>
+            )}
+          </section>
         </main>
       ) : currentPage === 'admin-login' ? (
         <main className="admin-page">
@@ -560,14 +1114,14 @@ function App() {
             <h1>Admin sign in</h1>
             <p className="admin-description">Sign in to review confirmed patient appointments.</p>
             <form onSubmit={handleAdminLogin}>
-              <label htmlFor="adminEmail">Admin email</label>
-              <input id="adminEmail" type="email" autoComplete="username" required value={adminEmail} onChange={(event) => setAdminEmail(event.target.value)} />
+              <label htmlFor="adminEmail">Hospital admin username</label>
+              <input id="adminEmail" type="text" autoComplete="username" placeholder="Enter the exact hospital name" required value={adminEmail} onChange={(event) => setAdminEmail(event.target.value)} />
               <label htmlFor="adminPassword">Password</label>
               <input id="adminPassword" type="password" autoComplete="current-password" required value={adminPassword} onChange={(event) => setAdminPassword(event.target.value)} />
               {adminLoginError && <p className="admin-login-error" role="alert">{adminLoginError}</p>}
               <button type="submit" className="btn btn-primary">Sign in to admin</button>
             </form>
-            <p className="admin-demo-note">Demo credentials: admin@mediconnect.com / Admin@123</p>
+            <p className="admin-demo-note">Username: exact hospital name (for example, PSG Hospitals)<br />Password: Admin@123</p>
           </section>
         </main>
       ) : currentPage === 'admin-dashboard' && adminUser ? (
@@ -575,8 +1129,8 @@ function App() {
           <div className="admin-heading">
             <div>
               <p className="booking-kicker">MediConnect administration</p>
-              <h1>Booked appointments</h1>
-              <p className="admin-description">Patient and visit details for confirmed bookings.</p>
+              <h1>{adminHospital} appointments</h1>
+              <p className="admin-description">Patient and visit details for confirmed bookings at this hospital.</p>
             </div>
             <div className="admin-total"><strong>{appointments.length}</strong><span>Total bookings</span></div>
           </div>
@@ -704,24 +1258,30 @@ function App() {
             />
           </div>
 
-          <div className="step-title">2. Medical Specialty</div>
-          <select value={specialty} onChange={(e) => { setSpecialty(e.target.value); setDoctorId(''); setDate(''); setTime(''); setSeat(null); setShowPayment(false); setUtr(''); setPaymentVerified(false); }}>
+          <div className="step-title">2. Hospital / Branch</div>
+          <select value={hospitalName} onChange={handleHospitalChange} aria-label="Select hospital branch">
+            <option value="">-- Choose Hospital Branch --</option>
+            {hospitalBranches.map((hospital) => (
+              <option key={hospital.name} value={hospital.name}>{hospital.name} · {hospital.location}</option>
+            ))}
+          </select>
+
+          <div className="step-title">3. Medical Specialty</div>
+          <select value={specialty} disabled={!hospitalName} onChange={(e) => { setSpecialty(e.target.value); setDoctorId(''); setDate(''); setTime(''); setSeat(null); setShowPayment(false); setUtr(''); setPaymentVerified(false); }}>
             <option value="">-- Choose Medical Specialty --</option>
             <option value="ENT">ENT (Ear, Nose &amp; Throat)</option>
             <option value="CARDIOLOGY">Cardiology &amp; Heart Care</option>
             <option value="NEUROSURGERY">Neurosurgery &amp; Spine</option>
           </select>
 
-          <div className="step-title">3. Specialist Doctor</div>
-          <select value={doctorId} onChange={handleDoctorSelect} disabled={!specialty}>
+          <div className="step-title">4. Specialist Doctor</div>
+          <select value={doctorId} onChange={handleDoctorSelect} disabled={!specialty || !hospitalName}>
             {!specialty ? (
               <option value="">Select specialty first</option>
             ) : (
               <>
-                <option value="">Select a Specialist</option>
-                {doctorList.map((doc) => (
-                  <option key={doc.id} value={doc.id}>{doc.name} ({doc.hospital.name})</option>
-                ))}
+                <option value="">{doctorList.length ? 'Select a Specialist' : 'No doctor available at this branch'}</option>
+                {doctorList.map((doc) => <option key={doc.id} value={doc.id}>{doc.name} ({doc.hospital.name})</option>)}
               </>
             )}
           </select>
@@ -732,7 +1292,7 @@ function App() {
             </div>
           )}
 
-          <div className="step-title">4. Consultation Date</div>
+          <div className="step-title">5. Consultation Date</div>
           <input
             type="date"
             id="dateInput"

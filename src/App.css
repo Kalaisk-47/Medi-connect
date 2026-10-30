@@ -23,6 +23,7 @@ html { scroll-behavior: smooth; }
 
 body {
   min-height: 100vh;
+  overflow-x: hidden;
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   color: var(--slate);
   background: radial-gradient(circle at 10% 10%, rgba(2, 132, 199, 0.08), transparent 30%),
@@ -100,7 +101,8 @@ body {
 }
 
 .nav-link-button:hover { color: var(--primary-dark); }
-.admin-mobile-link { display: none; }
+.admin-mobile-link,
+.ambulance-mobile-link { display: none; }
 
 .landing-hero {
   width: min(100% - 48px, 1120px);
@@ -315,7 +317,112 @@ body {
   letter-spacing: -1px;
 }
 
+.map-description { margin-top: 9px; color: var(--muted); font-size: 13px; line-height: 1.5; }
 .map-back-button { padding: 12px 18px; font-size: 12px; }
+
+.location-finder-card,
+.nearest-hospital-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 16px;
+  padding: 18px 20px;
+  border: 1px solid #bae6fd;
+  border-radius: 14px;
+  background: #f0f9ff;
+}
+
+.location-finder-copy { display: flex; align-items: center; gap: 12px; }
+.location-pin-icon { display: grid; width: 40px; height: 40px; flex: 0 0 auto; place-items: center; border-radius: 11px; background: #fff; color: var(--primary-dark); font-size: 23px; }
+.location-finder-copy strong { color: var(--navy); font-size: 13px; }
+.location-finder-copy p { margin-top: 4px; color: var(--muted); font-size: 11px; line-height: 1.45; }
+.location-share-button,
+.directions-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 9px;
+  padding: 11px 15px;
+  background: var(--primary);
+  color: #fff;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.location-share-button:hover,
+.directions-button:hover { background: var(--primary-dark); }
+.location-share-button:disabled { opacity: .6; cursor: wait; }
+.location-error { margin: -5px 0 16px; color: var(--danger); font-size: 12px; }
+.location-steps { display: grid; gap: 7px; margin: -2px 0 18px 22px; color: var(--muted); font-size: 11px; line-height: 1.45; }
+.location-steps strong { color: var(--slate); }
+.nearest-hospital-card { border-color: #bbf7d0; background: #f0fdf4; }
+.nearest-hospital-card h2 { margin-top: 5px; color: var(--navy); font-size: 20px; }
+.nearest-hospital-card p:last-child { margin-top: 5px; color: var(--muted); font-size: 12px; }
+.nearest-hospital-card .booking-kicker { color: #15803d; }
+
+.closest-hospitals-card {
+  margin-bottom: 16px;
+  padding: 20px;
+  border: 1px solid #cbd5e1;
+  border-radius: 14px;
+  background: #fff;
+}
+.closest-hospitals-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; }
+.closest-hospitals-heading h2 { margin-top: 5px; color: var(--navy); font-size: 20px; }
+.closest-hospitals-heading p:last-child { margin-top: 5px; color: var(--muted); font-size: 12px; }
+.hospital-count-badge { padding: 6px 10px; border-radius: 999px; background: var(--primary-light); color: var(--primary-dark); font-size: 10px; font-weight: 800; white-space: nowrap; }
+.closest-hospital-list { display: grid; gap: 10px; margin-top: 18px; }
+.closest-hospital-item { display: flex; align-items: center; gap: 12px; padding: 13px; border: 1px solid #e2e8f0; border-radius: 12px; }
+.hospital-rank { display: grid; width: 30px; height: 30px; flex: 0 0 auto; place-items: center; border-radius: 9px; background: var(--navy); color: #fff; font-size: 12px; font-weight: 800; }
+.closest-hospital-info { min-width: 0; flex: 1; }
+.closest-hospital-info strong { color: var(--navy); font-size: 13px; }
+.closest-hospital-info p { margin-top: 4px; color: var(--muted); font-size: 11px; }
+.ambulance-availability { display: inline-block; margin-top: 6px; color: var(--muted); font-size: 10px; font-weight: 700; }
+.ambulance-availability.available { color: #15803d; }
+.closest-hospital-actions { display: flex; align-items: center; gap: 7px; flex: 0 0 auto; }
+.closest-hospital-actions .directions-button,
+.emergency-call-button { padding: 9px 11px; font-size: 10px; }
+.emergency-call-button { display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: 9px; padding: 9px 11px; background: #dc2626; color: #fff; font: inherit; font-size: 10px; font-weight: 800; cursor: pointer; text-decoration: none; white-space: nowrap; }
+.emergency-call-button:hover { background: #b91c1c; }
+.ambulance-number-reveal { display: flex; flex-basis: 100%; align-items: center; gap: 9px; margin: 4px 0 0 42px; padding: 9px 11px; border-radius: 9px; background: #fef2f2; color: #991b1b; font-size: 11px; }
+.ambulance-number-reveal span { color: #b91c1c; }
+.ambulance-number-reveal strong { color: #7f1d1d; }
+.ambulance-number-reveal a { margin-left: auto; color: #b91c1c; font-weight: 800; text-decoration: none; }
+.ambulance-number-reveal a:hover { text-decoration: underline; }
+.closest-hospitals-empty { margin-top: 18px; padding: 15px; border: 1px dashed var(--border); border-radius: 10px; color: var(--muted); font-size: 12px; line-height: 1.5; }
+
+.ambulance-nearby-card {
+  margin-bottom: 16px;
+  padding: 20px;
+  border: 1px solid #cbd5e1;
+  border-radius: 14px;
+  background: #fff;
+}
+.ambulance-nearby-heading { display: flex; align-items: center; justify-content: space-between; gap: 18px; }
+.ambulance-nearby-heading h2 { margin-top: 5px; color: var(--navy); font-size: 20px; }
+.ambulance-nearby-heading p:last-child { margin-top: 5px; color: var(--muted); font-size: 12px; }
+.ambulance-details-button {
+  border: 1px solid var(--primary);
+  border-radius: 9px;
+  padding: 11px 15px;
+  background: #fff;
+  color: var(--primary-dark);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.ambulance-details-button:hover { background: var(--primary-light); }
+.ambulance-details-content { margin-top: 18px; }
+.ambulance-details-content .shared-ambulance-list { margin-top: 0; }
+.ambulance-location-map { display: block; width: 100%; height: 300px; margin-top: 14px; border: 0; border-radius: 12px; background: #e0f2fe; }
+.ambulance-details-empty { padding: 15px; border: 1px dashed var(--border); border-radius: 10px; color: var(--muted); font-size: 12px; line-height: 1.5; }
 
 .hospital-map {
   display: block;
@@ -475,6 +582,107 @@ body {
 .admin-login-panel input { width: 100%; }
 .admin-login-error { margin-top: 12px; color: var(--danger); font-size: 13px; }
 .admin-demo-note { margin-top: 20px; color: var(--muted); font-size: 11px; line-height: 1.5; }
+
+.ambulance-page {
+  width: min(100% - 48px, 920px);
+  min-height: calc(100vh - 76px);
+  margin: 0 auto;
+  padding: 64px 0 80px;
+}
+
+.ambulance-hero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 30px;
+  margin-bottom: 28px;
+}
+
+.ambulance-hero h1 {
+  margin-top: 8px;
+  color: var(--navy);
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: clamp(36px, 6vw, 58px);
+  font-weight: 500;
+  letter-spacing: -1.5px;
+}
+
+.ambulance-hero .admin-description { max-width: 580px; font-size: 15px; }
+.ambulance-hero-icon,
+.shared-ambulance-icon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  border-radius: 18px;
+  background: linear-gradient(135deg, var(--primary), var(--accent));
+  color: #fff;
+  font-size: 38px;
+  font-weight: 900;
+  box-shadow: 0 16px 30px rgba(2, 132, 199, 0.2);
+}
+.ambulance-hero-icon { width: 82px; height: 82px; }
+.ambulance-card,
+.ambulance-dashboard-card {
+  padding: 30px;
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.08);
+}
+.ambulance-login-card { max-width: 510px; }
+.ambulance-card-kicker { color: var(--primary); font-size: 11px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; }
+.ambulance-card h2,
+.ambulance-dashboard-card h2 { margin-top: 7px; color: var(--navy); font-size: 24px; letter-spacing: -0.5px; }
+.ambulance-card form { margin-top: 24px; }
+.ambulance-card label { display: block; margin: 15px 0 7px; color: var(--slate); font-size: 12px; font-weight: 750; }
+.ambulance-note { margin-top: 17px; color: var(--muted); font-size: 11px; line-height: 1.5; }
+.ambulance-error { margin-top: 12px; color: var(--danger); font-size: 13px; line-height: 1.45; }
+.ambulance-dashboard-card { margin-bottom: 22px; }
+.ambulance-driver-heading,
+.ambulance-panel-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; }
+.location-status {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  margin: 26px 0 16px;
+  padding: 16px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #f8fafc;
+}
+.location-status-active { border-color: #86efac; background: #f0fdf4; }
+.location-status-dot { width: 11px; height: 11px; flex: 0 0 auto; border-radius: 50%; background: #94a3b8; }
+.location-status-active .location-status-dot { background: #22c55e; box-shadow: 0 0 0 5px #dcfce7; }
+.location-status strong { color: var(--navy); font-size: 13px; }
+.location-status p { margin-top: 4px; color: var(--muted); font-size: 11px; }
+.driver-request-panel { margin-top: 26px; padding-top: 24px; border-top: 1px solid #e2e8f0; }
+.driver-request-panel h2 { font-size: 18px; }
+.driver-request-list { display: grid; gap: 12px; margin-top: 16px; }
+.driver-request { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; padding: 16px; border: 1px solid #bae6fd; border-radius: 12px; background: #f0f9ff; }
+.driver-request strong { color: var(--navy); font-size: 14px; }
+.driver-request p { margin-top: 5px; color: var(--muted); font-size: 11px; }
+.driver-request small { display: block; margin-top: 7px; color: var(--muted); font-size: 10px; }
+.request-coordinates { color: var(--primary-dark) !important; font-weight: 750; }
+.driver-request-actions { display: flex; flex: 0 0 auto; align-items: flex-end; flex-direction: column; gap: 8px; }
+.driver-request-actions .btn { padding: 10px 12px; font-size: 11px; }
+.ambulance-request-status { display: block; flex-basis: 100%; color: #15803d; font-size: 11px; font-weight: 700; }
+.ambulance-user-panel { margin-top: 22px; }
+.live-badge { display: inline-flex; align-items: center; gap: 7px; color: #15803d; font-size: 10px; font-weight: 900; letter-spacing: .8px; }
+.live-badge span { width: 7px; height: 7px; border-radius: 50%; background: #22c55e; }
+.shared-ambulance-list { display: grid; gap: 10px; margin-top: 22px; }
+.shared-ambulance { display: flex; align-items: center; gap: 13px; padding: 13px; border: 1px solid #dcfce7; border-radius: 12px; background: #f0fdf4; }
+.shared-ambulance-tracking { display: block; padding: 16px; border-color: #7dd3fc; background: #f0f9ff; }
+.shared-ambulance-tracking-heading { display: flex; align-items: center; gap: 13px; }
+.shared-ambulance-tracking-heading .live-badge { margin-left: auto; }
+.patient-location-map { display: block; width: 100%; height: 230px; margin-top: 16px; border: 0; border-radius: 10px; background: #e0f2fe; }
+.shared-ambulance-location-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 10px; color: var(--primary-dark); font-size: 11px; font-weight: 750; }
+.shared-ambulance-icon { width: 40px; height: 40px; border-radius: 10px; font-size: 21px; box-shadow: none; }
+.shared-ambulance strong { color: var(--navy); font-size: 13px; }
+.shared-ambulance p { margin-top: 4px; color: var(--muted); font-size: 11px; }
+.location-link { margin-left: auto; color: var(--primary-dark); font-size: 11px; font-weight: 800; text-decoration: none; white-space: nowrap; }
+.location-link:hover { text-decoration: underline; }
+.ambulance-empty-state { display: flex; align-items: center; gap: 12px; margin-top: 22px; padding: 20px; border: 1px dashed var(--border); border-radius: 12px; color: var(--muted); font-size: 12px; }
+.ambulance-empty-state span { color: var(--primary); font-size: 23px; }
 
 .admin-heading {
   display: flex;
@@ -1035,13 +1243,18 @@ select:disabled, input:disabled {
   .booking-layout { grid-template-columns: 1fr; gap: 0; }
   .card { padding: 22px; }
   .prescriptions-panel { position: static; margin: 20px 0 28px; padding: 18px; }
+  .landing-hero { gap: 28px; }
+  .nav-links { gap: 16px; margin-right: 18px; }
+  .hospital-map { height: min(62vh, 560px); }
+  .appointments-table-wrap { max-width: 100%; }
 }
 
 @media (max-width: 760px) {
   .navbar { padding: 12px 16px; }
   .nav-links { display: none; }
-  .nav-actions { margin-left: auto; }
-  .admin-mobile-link { display: inline-flex; border: 0; background: transparent; color: var(--primary-dark); font-size: 12px; font-weight: 750; cursor: pointer; }
+  .nav-actions { min-width: 0; margin-left: auto; }
+  .admin-mobile-link,
+  .ambulance-mobile-link { display: inline-flex; border: 0; background: transparent; color: var(--primary-dark); font-size: 12px; font-weight: 750; cursor: pointer; }
   .user-pill { display: none !important; }
   .landing-hero {
     width: min(100% - 32px, 560px);
@@ -1062,11 +1275,36 @@ select:disabled, input:disabled {
   .map-page { width: min(100% - 32px, 560px); padding: 32px 0 40px; }
   .map-heading { align-items: flex-start; flex-direction: column; gap: 16px; }
   .map-back-button { width: 100%; }
+  .location-finder-card, .nearest-hospital-card { align-items: flex-start; flex-direction: column; }
+  .location-share-button, .directions-button { width: 100%; }
+  .ambulance-nearby-heading { align-items: flex-start; flex-direction: column; }
+  .ambulance-details-button { width: 100%; }
+  .closest-hospitals-heading { flex-direction: column; }
+  .closest-hospital-item { align-items: flex-start; flex-wrap: wrap; }
+  .closest-hospital-actions { width: 100%; margin-left: 42px; }
+  .closest-hospital-actions .directions-button, .emergency-call-button { flex: 1; }
+  .ambulance-number-reveal { margin-left: 42px; }
   .hospital-map { height: 65vh; min-height: 320px; }
   .container { width: min(100% - 24px, 560px); margin-top: 18px; }
   .booking-layout { grid-template-columns: 1fr; gap: 0; }
   .prescriptions-panel { position: static; margin: 20px 0 28px; }
   .admin-page { width: min(100% - 28px, 560px); padding: 42px 0; }
+  .ambulance-page { width: calc(100% - 28px); max-width: 560px; min-height: auto; padding: 32px 0 56px; }
+  .ambulance-hero { align-items: flex-start; flex-direction: column; margin-bottom: 20px; }
+  .ambulance-hero h1 { max-width: 100%; font-size: clamp(32px, 9vw, 38px); line-height: 1.05; }
+  .ambulance-hero .admin-description { font-size: 13px; }
+  .ambulance-hero-icon { width: 58px; height: 58px; font-size: 28px; }
+  .ambulance-card, .ambulance-dashboard-card { padding: 22px 18px; }
+  .ambulance-driver-heading, .ambulance-panel-heading { align-items: flex-start; flex-direction: column; }
+  .shared-ambulance { align-items: flex-start; flex-wrap: wrap; }
+  .shared-ambulance-tracking-heading { align-items: flex-start; flex-wrap: wrap; }
+  .shared-ambulance-tracking-heading .live-badge { margin-left: 0; }
+  .shared-ambulance-location-footer { align-items: flex-start; flex-direction: column; }
+  .driver-request { flex-direction: column; }
+  .driver-request-actions { width: 100%; align-items: stretch; }
+  .driver-request-actions .location-link { margin-left: 0; }
+  .driver-request-actions .btn { width: 100%; }
+  .location-link { margin-left: 53px; }
   .admin-login-panel { margin: 10px auto; padding: 26px 20px; }
   .admin-login-panel h1, .admin-heading h1 { font-size: 27px; }
   .admin-heading { align-items: flex-start; flex-direction: column; margin-bottom: 20px; }
@@ -1078,4 +1316,66 @@ select:disabled, input:disabled {
   .queue-ticker { align-items: flex-start; flex-direction: column; gap: 9px; }
   .card { padding: 20px 16px; }
   .prescription-preview-overlay { padding: 12px; }
+}
+
+@media (max-width: 560px) {
+  body { padding-bottom: 24px; }
+  .navbar { align-items: flex-start; gap: 10px; padding: 10px 12px; }
+  .brand { font-size: 17px; }
+  .brand-icon { width: 32px; height: 32px; font-size: 17px; }
+  .nav-actions { flex-wrap: wrap; justify-content: flex-end; gap: 4px; }
+  .auth-btn { padding: 7px 10px; font-size: 11px; }
+  .admin-mobile-link,
+  .ambulance-mobile-link { padding: 5px 4px; font-size: 11px; }
+  .landing-hero { width: min(100% - 24px, 430px); padding: 38px 0 22px; }
+  .landing-copy h1 { font-size: clamp(38px, 12vw, 52px); letter-spacing: -1.5px; }
+  .landing-lede { font-size: 14px; }
+  .landing-proof { margin-top: 26px; }
+  .landing-art { min-height: 260px; }
+  .landing-art::before { width: 230px; height: 230px; }
+  .art-card { max-width: 190px; padding: 10px; }
+  .art-card-top { top: 8px; }
+  .art-card-bottom { bottom: 8px; }
+  .map-page { width: min(100% - 24px, 520px); padding-top: 24px; }
+  .map-heading h1 { font-size: clamp(30px, 10vw, 42px); }
+  .map-description { font-size: 12px; }
+  .location-finder-card, .nearest-hospital-card, .closest-hospitals-card, .ambulance-nearby-card { padding: 15px; }
+  .location-finder-copy { align-items: flex-start; }
+  .closest-hospital-actions { margin-left: 0; }
+  .ambulance-number-reveal { align-items: flex-start; flex-wrap: wrap; margin-left: 0; }
+  .ambulance-number-reveal a { margin-left: 0; }
+  .hospital-map { height: 52vh; min-height: 280px; }
+  .ambulance-location-map { height: 240px; }
+  .ambulance-page { width: calc(100% - 24px); padding-top: 24px; }
+  .ambulance-card, .ambulance-dashboard-card { padding: 18px 14px; }
+  .ambulance-card h2, .ambulance-dashboard-card h2 { font-size: 21px; }
+  .ambulance-card form { margin-top: 18px; }
+  .ambulance-card input { height: 46px; }
+  .ambulance-login-card .btn { width: 100%; }
+  .booking-intro h2 { font-size: 22px; }
+  .queue-ticker { padding: 12px; }
+  .symptom-section .chip-grid { grid-template-columns: 1fr; }
+  .family-row { grid-template-columns: 1fr; }
+  .slot-grid { grid-template-columns: repeat(2, 1fr); }
+  .seat-grid { grid-template-columns: repeat(5, 1fr); gap: 5px; }
+  .seat { height: 36px; }
+  .booking-summary { grid-template-columns: 1fr; }
+  .payment-choice { margin-left: 0; margin-right: 0; }
+  .admin-heading h1 { font-size: 25px; }
+  .admin-total { align-self: stretch; }
+}
+
+@media (max-width: 380px) {
+  .navbar { flex-wrap: wrap; }
+  .nav-actions { margin-left: 0; width: 100%; justify-content: flex-end; }
+  .landing-actions { width: 100%; }
+  .landing-cta { justify-content: center; width: 100%; }
+  .service-strip { width: min(100% - 24px, 430px); }
+  .hospital-count-badge { align-self: flex-start; }
+  .closest-hospital-item { gap: 8px; }
+  .hospital-rank { width: 26px; height: 26px; }
+  .closest-hospital-actions { flex-direction: column; align-items: stretch; }
+  .closest-hospital-actions .directions-button, .emergency-call-button { width: 100%; }
+  .ambulance-hero { gap: 12px; }
+  .ambulance-hero-icon { display: none; }
 }
