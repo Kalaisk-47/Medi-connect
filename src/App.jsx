@@ -1196,10 +1196,10 @@ function App() {
         </div>
 
         <div className="footer">
-          © 2026 MediConnect · <a className="medai-footer-button" href="https://jeevinth008-pixel.github.io/Mediconnect/" target="_blank" rel="noopener noreferrer">MedAI</a>
+          © 2026 MediConnect · <a className="medai-footer-button" href="https://medi-connect-chatbot.onrender.com" target="_blank" rel="noopener noreferrer">MedAI</a>
         </div>
-      </div>
-      )}
+        </div>
+        )}
 
       <div id="authModal" className="modal-overlay" style={{ display: isAuthOpen ? 'grid' : 'none' }}>
         <div className="modal-card">
