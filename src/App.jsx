@@ -27,9 +27,19 @@ const TOTAL_SEATS = 10
 const ADMIN_CREDENTIALS = { email: 'admin@mediconnect.com', password: 'Admin@123' }
 const PRESCRIPTION_DB_NAME = 'mediconnect-prescriptions'
 const PRESCRIPTION_STORE_NAME = 'attachments'
-const readAppointments = () => {
+const hospitalBranches = [
+  { name: 'PSG Hospitals', location: 'Peelamedu, Coimbatore' },
+  { name: 'Sri Ramakrishna Hospital', location: 'Siddhapudur, Coimbatore' },
+  { name: 'KMCH', location: 'Avinashi Road, Coimbatore' },
+  { name: 'Ganga Hospital', location: 'Swarnambika Layout, Coimbatore' }
+]
+
+const hospitalStorageKey = (hospitalName) => `mediconnect_appointments_${normalizeHospitalName(hospitalName)}`
+
+const readHospitalAppointments = (hospitalName) => {
+  if (!hospitalName) return []
   try {
-    return JSON.parse(localStorage.getItem('mediconnect_appointments') || '[]')
+    return JSON.parse(localStorage.getItem(hospitalStorageKey(hospitalName)) || '[]')
   } catch {
     return []
   }
@@ -316,6 +326,7 @@ function PrescriptionAttachments() {
 }
 
 function App() {
+  const [hospitalName, setHospitalName] = useState('')
   const [specialty, setSpecialty] = useState('')
   const [doctorId, setDoctorId] = useState('')
   const [patientType, setPatientType] = useState('Myself')
@@ -334,8 +345,9 @@ function App() {
   const [currentPage, setCurrentPage] = useState('home')
   const [isAuthOpen, setIsAuthOpen] = useState(false)
   const [loginInput, setLoginInput] = useState('')
-  const [appointments, setAppointments] = useState(readAppointments)
+  const [appointments, setAppointments] = useState(() => readHospitalAppointments(localStorage.getItem('mediconnect_admin_hospital') || ''))
   const [adminUser, setAdminUser] = useState(() => localStorage.getItem('mediconnect_admin') === 'true')
+  const [adminHospital, setAdminHospital] = useState(() => localStorage.getItem('mediconnect_admin_hospital') || '')
   const [adminEmail, setAdminEmail] = useState('')
   const [adminPassword, setAdminPassword] = useState('')
   const [adminLoginError, setAdminLoginError] = useState('')
@@ -393,23 +405,42 @@ function App() {
   }, [])
 
   const selectedDoctor = useMemo(
-    () => (specialty ? doctors[specialty].find((d) => d.id === doctorId) : null),
-    [specialty, doctorId]
+    () => (specialty ? doctors[specialty].find((d) => d.id === doctorId && d.hospital.name === hospitalName) : null),
+    [specialty, doctorId, hospitalName]
   )
 
   const bookedSeats = useMemo(() => {
     if (!selectedDoctor || !date || !time) return []
     const storedSeats = appointments
-      .filter((appointment) => appointment.doctorId === selectedDoctor.id && appointment.date === date && appointment.time === time)
+      .filter((appointment) => appointment.hospital === hospitalName && appointment.doctorId === selectedDoctor.id && appointment.date === date && appointment.time === time)
       .map((appointment) => appointment.seat)
     return [...new Set([...getDeterministicBookedSeats(selectedDoctor.id, date, time), ...storedSeats])]
-  }, [selectedDoctor, date, time, appointments])
+  }, [selectedDoctor, hospitalName, date, time, appointments])
 
   const availableSeatCount = TOTAL_SEATS - bookedSeats.length
   const canSubmitAppointment = paymentMethod === 'hospital' || (paymentMethod === 'online' && paymentVerified)
 
   const handleSymptomMatch = (specKey) => {
+    if (!hospitalName) {
+      alert('Please select a hospital branch first.')
+      return
+    }
     setSpecialty(specKey)
+    setDoctorId('')
+    setDate('')
+    setTime('')
+    setSeat(null)
+    setShowPayment(false)
+    setPaymentMethod('')
+    setUtr('')
+    setPaymentVerified(false)
+  }
+
+  const handleHospitalChange = (event) => {
+    const nextHospitalName = event.target.value
+    setHospitalName(nextHospitalName)
+    setAppointments(readHospitalAppointments(nextHospitalName))
+    setSpecialty('')
     setDoctorId('')
     setDate('')
     setTime('')
@@ -514,7 +545,7 @@ function App() {
       createdAt: new Date().toISOString()
     }
     const nextAppointments = [...appointments, appointment]
-    localStorage.setItem('mediconnect_appointments', JSON.stringify(nextAppointments))
+    localStorage.setItem(hospitalStorageKey(hospitalName), JSON.stringify(nextAppointments))
     setAppointments(nextAppointments)
     alert(`🎉 Token #${seat} Confirmed!\n\nPatient: ${patientType}\nDoctor: ${selectedDoctor.name}\nHospital: ${selectedDoctor.hospital.name}\nDate: ${date} at ${time}\n\nSMS alert sent to your registered mobile.`)
     resetForm()
@@ -522,12 +553,16 @@ function App() {
 
   const handleAdminLogin = (event) => {
     event.preventDefault()
-    if (adminEmail.trim().toLowerCase() !== ADMIN_CREDENTIALS.email || adminPassword !== ADMIN_CREDENTIALS.password) {
-      setAdminLoginError('The email or password is incorrect.')
+    const matchedHospital = hospitalBranches.find((hospital) => normalizeHospitalName(hospital.name) === normalizeHospitalName(adminEmail.trim()))
+    if (!matchedHospital || adminPassword !== ADMIN_CREDENTIALS.password) {
+      setAdminLoginError('Enter a hospital name from the booking list and the correct admin password.')
       return
     }
     localStorage.setItem('mediconnect_admin', 'true')
+    localStorage.setItem('mediconnect_admin_hospital', matchedHospital.name)
     setAdminUser(true)
+    setAdminHospital(matchedHospital.name)
+    setAppointments(readHospitalAppointments(matchedHospital.name))
     setAdminLoginError('')
     setAdminEmail('')
     setAdminPassword('')
@@ -536,7 +571,10 @@ function App() {
 
   const handleAdminLogout = () => {
     localStorage.removeItem('mediconnect_admin')
+    localStorage.removeItem('mediconnect_admin_hospital')
     setAdminUser(false)
+    setAdminHospital('')
+    setAppointments([])
     setCurrentPage('home')
   }
 
@@ -699,10 +737,10 @@ function App() {
     setLoginInput('')
   }
 
-  const doctorList = specialty ? doctors[specialty] : []
+  const doctorList = specialty ? doctors[specialty].filter((doctor) => doctor.hospital.name === hospitalName) : []
   const dayOfWeek = date ? new Date(`${date}T00:00:00`).getDay() : null
   const isToday = date === getLocalDateString()
-  const qrImage = '/payment-qr.svg'
+  const qrImage = `${import.meta.env.BASE_URL}payment-qr.svg`
   const nearestHospital = userLocation
     ? nearbyHospitals
       .map((hospital) => ({
@@ -1057,14 +1095,14 @@ function App() {
             <h1>Admin sign in</h1>
             <p className="admin-description">Sign in to review confirmed patient appointments.</p>
             <form onSubmit={handleAdminLogin}>
-              <label htmlFor="adminEmail">Admin email</label>
-              <input id="adminEmail" type="email" autoComplete="username" required value={adminEmail} onChange={(event) => setAdminEmail(event.target.value)} />
+              <label htmlFor="adminEmail">Hospital admin username</label>
+              <input id="adminEmail" type="text" autoComplete="username" placeholder="Enter the exact hospital name" required value={adminEmail} onChange={(event) => setAdminEmail(event.target.value)} />
               <label htmlFor="adminPassword">Password</label>
               <input id="adminPassword" type="password" autoComplete="current-password" required value={adminPassword} onChange={(event) => setAdminPassword(event.target.value)} />
               {adminLoginError && <p className="admin-login-error" role="alert">{adminLoginError}</p>}
               <button type="submit" className="btn btn-primary">Sign in to admin</button>
             </form>
-            <p className="admin-demo-note">Demo credentials: admin@mediconnect.com / Admin@123</p>
+            <p className="admin-demo-note">Username: exact hospital name (for example, PSG Hospitals)<br />Password: Admin@123</p>
           </section>
         </main>
       ) : currentPage === 'admin-dashboard' && adminUser ? (
@@ -1072,8 +1110,8 @@ function App() {
           <div className="admin-heading">
             <div>
               <p className="booking-kicker">MediConnect administration</p>
-              <h1>Booked appointments</h1>
-              <p className="admin-description">Patient and visit details for confirmed bookings.</p>
+              <h1>{adminHospital} appointments</h1>
+              <p className="admin-description">Patient and visit details for confirmed bookings at this hospital.</p>
             </div>
             <div className="admin-total"><strong>{appointments.length}</strong><span>Total bookings</span></div>
           </div>
@@ -1201,24 +1239,30 @@ function App() {
             />
           </div>
 
-          <div className="step-title">2. Medical Specialty</div>
-          <select value={specialty} onChange={(e) => { setSpecialty(e.target.value); setDoctorId(''); setDate(''); setTime(''); setSeat(null); setShowPayment(false); setUtr(''); setPaymentVerified(false); }}>
+          <div className="step-title">2. Hospital / Branch</div>
+          <select value={hospitalName} onChange={handleHospitalChange} aria-label="Select hospital branch">
+            <option value="">-- Choose Hospital Branch --</option>
+            {hospitalBranches.map((hospital) => (
+              <option key={hospital.name} value={hospital.name}>{hospital.name} · {hospital.location}</option>
+            ))}
+          </select>
+
+          <div className="step-title">3. Medical Specialty</div>
+          <select value={specialty} disabled={!hospitalName} onChange={(e) => { setSpecialty(e.target.value); setDoctorId(''); setDate(''); setTime(''); setSeat(null); setShowPayment(false); setUtr(''); setPaymentVerified(false); }}>
             <option value="">-- Choose Medical Specialty --</option>
             <option value="ENT">ENT (Ear, Nose &amp; Throat)</option>
             <option value="CARDIOLOGY">Cardiology &amp; Heart Care</option>
             <option value="NEUROSURGERY">Neurosurgery &amp; Spine</option>
           </select>
 
-          <div className="step-title">3. Specialist Doctor</div>
-          <select value={doctorId} onChange={handleDoctorSelect} disabled={!specialty}>
+          <div className="step-title">4. Specialist Doctor</div>
+          <select value={doctorId} onChange={handleDoctorSelect} disabled={!specialty || !hospitalName}>
             {!specialty ? (
               <option value="">Select specialty first</option>
             ) : (
               <>
-                <option value="">Select a Specialist</option>
-                {doctorList.map((doc) => (
-                  <option key={doc.id} value={doc.id}>{doc.name} ({doc.hospital.name})</option>
-                ))}
+                <option value="">{doctorList.length ? 'Select a Specialist' : 'No doctor available at this branch'}</option>
+                {doctorList.map((doc) => <option key={doc.id} value={doc.id}>{doc.name} ({doc.hospital.name})</option>)}
               </>
             )}
           </select>
@@ -1229,7 +1273,7 @@ function App() {
             </div>
           )}
 
-          <div className="step-title">4. Consultation Date</div>
+          <div className="step-title">5. Consultation Date</div>
           <input
             type="date"
             id="dateInput"
