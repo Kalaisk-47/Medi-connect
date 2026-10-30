@@ -51,6 +51,14 @@ const readSharedAmbulances = () => {
   }
 }
 
+const readAmbulanceRequests = () => {
+  try {
+    return JSON.parse(localStorage.getItem('mediconnect_ambulance_requests') || '[]')
+  } catch {
+    return []
+  }
+}
+
 const nearbyHospitals = [
   { name: 'PSG Hospitals', location: 'Peelamedu, Coimbatore', latitude: 11.0236, longitude: 76.9345 },
   { name: 'Sri Ramakrishna Hospital', location: 'Siddhapudur, Coimbatore', latitude: 11.0183, longitude: 76.9714 },
@@ -336,6 +344,7 @@ function App() {
   const [ambulanceHospital, setAmbulanceHospital] = useState('')
   const [ambulanceError, setAmbulanceError] = useState('')
   const [sharedAmbulances, setSharedAmbulances] = useState(readSharedAmbulances)
+  const [ambulanceRequests, setAmbulanceRequests] = useState(readAmbulanceRequests)
   const [isSharingLocation, setIsSharingLocation] = useState(() => readSharedAmbulances().length > 0)
   const [userLocation, setUserLocation] = useState(null)
   const [locationError, setLocationError] = useState('')
@@ -346,11 +355,41 @@ function App() {
     const saved = localStorage.getItem('mediconnect_user')
     return saved ? JSON.parse(saved) : null
   })
+  const patientLocationWatchRef = useRef(null)
+  const activeAmbulanceRequestIdRef = useRef(null)
 
   useEffect(() => {
     const minDate = getLocalDateString()
     const dateInput = document.getElementById('dateInput')
     if (dateInput) dateInput.min = minDate
+  }, [])
+
+  useEffect(() => {
+    const syncAmbulanceData = () => {
+      setSharedAmbulances(readSharedAmbulances())
+      const nextRequests = readAmbulanceRequests()
+      setAmbulanceRequests(nextRequests)
+      const activeRequest = nextRequests.find((request) => request.id === activeAmbulanceRequestIdRef.current)
+      if (activeAmbulanceRequestIdRef.current && (!activeRequest || activeRequest.status === 'completed')) {
+        if (patientLocationWatchRef.current !== null && navigator.geolocation) {
+          navigator.geolocation.clearWatch(patientLocationWatchRef.current)
+        }
+        patientLocationWatchRef.current = null
+        activeAmbulanceRequestIdRef.current = null
+      }
+    }
+    window.addEventListener('storage', syncAmbulanceData)
+    const refreshTimer = window.setInterval(syncAmbulanceData, 3000)
+    return () => {
+      window.removeEventListener('storage', syncAmbulanceData)
+      window.clearInterval(refreshTimer)
+    }
+  }, [])
+
+  useEffect(() => () => {
+    if (patientLocationWatchRef.current !== null && navigator.geolocation) {
+      navigator.geolocation.clearWatch(patientLocationWatchRef.current)
+    }
   }, [])
 
   const selectedDoctor = useMemo(
@@ -551,6 +590,66 @@ function App() {
     setIsSharingLocation(false)
   }
 
+  const updateAmbulanceRequestLocation = (requestId, latitude, longitude) => {
+    const requests = readAmbulanceRequests()
+    const nextRequests = requests.map((request) => request.id === requestId
+      ? { ...request, latitude, longitude, updatedAt: new Date().toISOString() }
+      : request)
+    localStorage.setItem('mediconnect_ambulance_requests', JSON.stringify(nextRequests))
+    setAmbulanceRequests(nextRequests)
+  }
+
+  const handleCallAmbulance = (ambulance) => {
+    if (!navigator.geolocation) {
+      setLocationError('Location access is not supported by this browser. Please call the ambulance directly.')
+      setVisibleAmbulancePhone(ambulance.phone)
+      return
+    }
+    setLocationError('')
+    setVisibleAmbulancePhone(ambulance.phone)
+    navigator.geolocation.getCurrentPosition(
+      ({ coords }) => {
+        const request = {
+          id: `${Date.now()}-${ambulance.phone}`,
+          ambulancePhone: ambulance.phone,
+          hospital: ambulance.hospital,
+          patientName: currentUser?.name || patientName.trim() || 'Patient',
+          patientPhone: currentUser?.email || 'Not provided',
+          latitude: coords.latitude,
+          longitude: coords.longitude,
+          status: 'pending',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        }
+        const nextRequests = [...readAmbulanceRequests(), request]
+        localStorage.setItem('mediconnect_ambulance_requests', JSON.stringify(nextRequests))
+        setAmbulanceRequests(nextRequests)
+        setUserLocation({ latitude: coords.latitude, longitude: coords.longitude })
+        activeAmbulanceRequestIdRef.current = request.id
+        if (patientLocationWatchRef.current === null && navigator.geolocation.watchPosition) {
+          patientLocationWatchRef.current = navigator.geolocation.watchPosition(
+            ({ coords: updatedCoords }) => {
+              setUserLocation({ latitude: updatedCoords.latitude, longitude: updatedCoords.longitude })
+              updateAmbulanceRequestLocation(request.id, updatedCoords.latitude, updatedCoords.longitude)
+            },
+            () => setLocationError('Live tracking was interrupted. The driver can still use your last shared location.'),
+            { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 }
+          )
+        }
+      },
+      () => setLocationError('Location permission was not granted. Please allow access so the driver can find you, then try again.'),
+      { enableHighAccuracy: true, timeout: 10000 }
+    )
+  }
+
+  const handleAmbulanceRequestStatus = (requestId, status) => {
+    const nextRequests = readAmbulanceRequests().map((request) => request.id === requestId
+      ? { ...request, status, updatedAt: new Date().toISOString() }
+      : request)
+    localStorage.setItem('mediconnect_ambulance_requests', JSON.stringify(nextRequests))
+    setAmbulanceRequests(nextRequests)
+  }
+
   const handleAmbulanceLogout = () => {
     handleStopSharingLocation()
     localStorage.removeItem('mediconnect_ambulance_driver')
@@ -627,6 +726,9 @@ function App() {
   const ambulanceMapUrl = sharedAmbulances.length
     ? `https://www.google.com/maps?q=${sharedAmbulances[0].latitude},${sharedAmbulances[0].longitude}&output=embed`
     : ''
+  const driverRequests = ambulanceDriver
+    ? ambulanceRequests.filter((request) => normalizeHospitalName(request.hospital) === normalizeHospitalName(ambulanceDriver.hospital) && request.status !== 'completed')
+    : []
 
   return (
     <>
@@ -652,6 +754,9 @@ function App() {
         <div className="nav-actions">
           <button type="button" className="admin-mobile-link" onClick={() => setCurrentPage(adminUser ? 'admin-dashboard' : 'admin-login')}>
             {adminUser ? 'Admin' : 'Admin login'}
+          </button>
+          <button type="button" className="ambulance-mobile-link" onClick={() => setCurrentPage('ambulance')}>
+            Ambulance
           </button>
           <div id="userProfile" className="user-pill" style={{ display: currentUser ? 'inline-flex' : 'none' }}>
             <span>👤</span>
@@ -734,7 +839,7 @@ function App() {
                       <div className="closest-hospital-actions">
                         <a className="directions-button" href={`https://www.google.com/maps/dir/?api=1&origin=${userLocation.latitude},${userLocation.longitude}&destination=${hospital.latitude},${hospital.longitude}`} target="_blank" rel="noopener noreferrer">Directions</a>
                         {sharedAmbulance && (
-                          <button type="button" className="emergency-call-button" onClick={() => setVisibleAmbulancePhone(sharedAmbulance.phone)}>
+                          <button type="button" className="emergency-call-button" onClick={() => handleCallAmbulance(sharedAmbulance)}>
                             Call ambulance
                           </button>
                         )}
@@ -743,6 +848,9 @@ function App() {
                         <div className="ambulance-number-reveal" role="status">
                           <span>Registered ambulance number</span>
                           <strong>+91 {sharedAmbulance.phone}</strong>
+                          {ambulanceRequests.some((request) => request.ambulancePhone === sharedAmbulance.phone && request.status !== 'completed') && (
+                            <small className="ambulance-request-status">Your location is shared with this driver. Live tracking is active.</small>
+                          )}
                           <a href={`tel:+91${sharedAmbulance.phone}`}>Call now</a>
                         </div>
                       )}
@@ -850,6 +958,38 @@ function App() {
               ) : (
                 <button type="button" className="btn btn-primary" onClick={handleShareLocation}>Share my current location</button>
               )}
+              <section className="driver-request-panel" aria-label="Patient ambulance requests">
+                <div className="ambulance-panel-heading">
+                  <div>
+                    <p className="ambulance-card-kicker">Incoming requests</p>
+                    <h2>{driverRequests.length ? `${driverRequests.length} patient${driverRequests.length === 1 ? '' : 's'} need help` : 'No active patient requests'}</h2>
+                  </div>
+                  <span className="live-badge"><span /> AUTO-REFRESH</span>
+                </div>
+                {driverRequests.length ? (
+                  <div className="driver-request-list">
+                    {driverRequests.map((request) => (
+                      <article className="driver-request" key={request.id}>
+                        <div>
+                          <strong>{request.patientName}</strong>
+                          <p>{request.patientPhone} · {request.status === 'accepted' ? 'Accepted' : 'Waiting for response'}</p>
+                          <p className="request-coordinates">Live location: {request.latitude.toFixed(5)}, {request.longitude.toFixed(5)}</p>
+                          <small>Updated {new Date(request.updatedAt).toLocaleTimeString()}</small>
+                        </div>
+                        <div className="driver-request-actions">
+                          <a className="location-link" href={`https://www.google.com/maps/dir/?api=1&destination=${request.latitude},${request.longitude}`} target="_blank" rel="noopener noreferrer">Navigate ↗</a>
+                          {request.status !== 'accepted' && (
+                            <button type="button" className="btn btn-primary" onClick={() => handleAmbulanceRequestStatus(request.id, 'accepted')}>Accept request</button>
+                          )}
+                          <button type="button" className="btn btn-secondary" onClick={() => handleAmbulanceRequestStatus(request.id, 'completed')}>Complete</button>
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="ambulance-details-empty">Patient requests for {ambulanceDriver.hospital} will appear here with a live location.</p>
+                )}
+              </section>
             </section>
           )}
           <section className="ambulance-card ambulance-user-panel">
@@ -862,16 +1002,48 @@ function App() {
             </div>
             {sharedAmbulances.length ? (
               <div className="shared-ambulance-list">
-                {sharedAmbulances.map((ambulance) => (
-                  <article className="shared-ambulance" key={ambulance.phone}>
-                    <div className="shared-ambulance-icon">+</div>
-                    <div>
-                      <strong>{ambulance.hospital} ambulance</strong>
-                      <p>Driver available · Location shared just now</p>
-                    </div>
-                    <a className="location-link" href={`https://www.google.com/maps?q=${ambulance.latitude},${ambulance.longitude}`} target="_blank" rel="noopener noreferrer">Open map ↗</a>
-                  </article>
-                ))}
+                {sharedAmbulances.map((ambulance) => {
+                  const patientRequest = ambulanceRequests.find((request) => request.ambulancePhone === ambulance.phone && request.status !== 'completed')
+                  const patientMapUrl = patientRequest
+                    ? `https://www.google.com/maps?q=${patientRequest.latitude},${patientRequest.longitude}&output=embed`
+                    : ''
+                  return (
+                    <article className={`shared-ambulance ${patientRequest ? 'shared-ambulance-tracking' : ''}`} key={ambulance.phone}>
+                      {patientRequest ? (
+                        <>
+                          <div className="shared-ambulance-tracking-heading">
+                            <div className="shared-ambulance-icon">+</div>
+                            <div>
+                              <strong>Patient location shared</strong>
+                              <p>{patientRequest.patientName} · Live location updates enabled</p>
+                            </div>
+                            <span className="live-badge"><span /> TRACKING</span>
+                          </div>
+                          <iframe
+                            className="patient-location-map"
+                            src={patientMapUrl}
+                            title={`Live location for ${patientRequest.patientName}`}
+                            loading="lazy"
+                            referrerPolicy="strict-origin-when-cross-origin"
+                          />
+                          <div className="shared-ambulance-location-footer">
+                            <span>{patientRequest.latitude.toFixed(5)}, {patientRequest.longitude.toFixed(5)}</span>
+                            <a className="location-link" href={`https://www.google.com/maps/dir/?api=1&destination=${patientRequest.latitude},${patientRequest.longitude}`} target="_blank" rel="noopener noreferrer">Navigate to patient ↗</a>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <div className="shared-ambulance-icon">+</div>
+                          <div>
+                            <strong>{ambulance.hospital} ambulance</strong>
+                            <p>Driver available · Location shared just now</p>
+                          </div>
+                          <a className="location-link" href={`https://www.google.com/maps?q=${ambulance.latitude},${ambulance.longitude}`} target="_blank" rel="noopener noreferrer">Open map ↗</a>
+                        </>
+                      )}
+                    </article>
+                  )
+                })}
               </div>
             ) : (
               <div className="ambulance-empty-state"><span aria-hidden="true">⌖</span><p>No ambulance locations are being shared right now.</p></div>
