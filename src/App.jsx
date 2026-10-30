@@ -213,7 +213,7 @@ function PrescriptionPreview({ attachment, onClose }) {
       <section className="prescription-preview-dialog" role="dialog" aria-modal="true" aria-label={`Preview ${attachment.name}`}>
         <div className="prescription-preview-header">
           <strong>{attachment.name}</strong>
-          <button type="button" className="prescription-remove-button" onClick={onClose} aria-label="Close prescription preview">×</button>
+          <button type="button" className="prescription-remove-button" onClick={onClose} aria-label="Close prescription preview"></button>
         </div>
         {attachment.type.startsWith('image/') ? (
           <img className="prescription-full-preview" src={previewUrl} alt={attachment.name} />
@@ -279,7 +279,7 @@ function PrescriptionAttachments() {
   return (
     <aside className="prescriptions-panel" aria-label="Prescription attachments">
       <div className="prescriptions-heading">
-        <span className="prescriptions-icon" aria-hidden="true">＋</span>
+        <span className="prescriptions-icon" aria-hidden="true"></span>
         <div>
           <h2>Prescriptions</h2>
           <p>Keep your medical documents handy.</p>
@@ -295,12 +295,12 @@ function PrescriptionAttachments() {
         aria-label="Choose prescription images or PDF files"
       />
       <button type="button" className="prescription-add-button" onClick={() => fileInputRef.current?.click()}>
-        <span aria-hidden="true">＋</span> Add prescriptions
+        <span aria-hidden="true">+</span> Add prescriptions
       </button>
       <p className="prescriptions-storage-note">Images and PDFs are saved on this device.</p>
       {storageError && <p className="prescriptions-error" role="alert">{storageError}</p>}
       {isLoading ? (
-        <p className="prescriptions-empty" role="status">Loading saved prescriptions…</p>
+        <p className="prescriptions-empty" role="status">Loading saved prescriptions...</p>
       ) : attachments.length ? (
         <ul className="prescription-list">
           {attachments.map((attachment) => (
@@ -313,7 +313,7 @@ function PrescriptionAttachments() {
                 )}
                 <span className="prescription-file-name">{attachment.name}</span>
               </button>
-              <button type="button" className="prescription-remove-button" onClick={() => handleDelete(attachment.id)} aria-label={`Remove ${attachment.name}`}>×</button>
+              <button type="button" className="prescription-remove-button" onClick={() => handleDelete(attachment.id)} aria-label={`Remove ${attachment.name}`}></button>
             </li>
           ))}
         </ul>
@@ -335,6 +335,9 @@ function App() {
     return saved ? JSON.parse(saved).name : ''
   })
   const [patientAge, setPatientAge] = useState('26')
+  const [patientGender, setPatientGender] = useState('')
+  const [patientAddress, setPatientAddress] = useState('')
+  const [profilePhoto, setProfilePhoto] = useState('')
   const [date, setDate] = useState('')
   const [time, setTime] = useState('')
   const [seat, setSeat] = useState(null)
@@ -516,7 +519,10 @@ function App() {
       return
     }
 
-    const nextUser = { name: identifier.split('@')[0] || 'Patient', email: identifier }
+    if (!patientName.trim()) { setLoginError('Enter patient name.'); return }
+    if (!patientAge || Number(patientAge) < 1 || Number(patientAge) > 120) { setLoginError('Enter a valid age.'); return }
+    if (!patientGender || !patientAddress.trim()) { setLoginError('Complete all patient details.'); return }
+    const nextUser = { name: patientName.trim(), age: Number(patientAge), gender: patientGender, address: patientAddress.trim(), photo: profilePhoto, email: identifier }
     localStorage.setItem('mediconnect_user', JSON.stringify(nextUser))
     setCurrentUser(nextUser)
     setPatientName(nextUser.name)
@@ -534,7 +540,7 @@ function App() {
   const handleVerify = () => {
     const cleanUtr = utr.trim()
     if (cleanUtr.length !== 12 || !/^\d{12}$/.test(cleanUtr)) {
-      alert('⚠️ Please enter a valid 12-digit UPI UTR / Transaction Reference Number.')
+      alert('Please enter a valid 12-digit UPI UTR / Transaction Reference Number.')
       return
     }
     setPaymentVerified(true)
@@ -564,7 +570,7 @@ function App() {
     const nextAppointments = [...appointments, appointment]
     localStorage.setItem(hospitalStorageKey(hospitalName), JSON.stringify(nextAppointments))
     setAppointments(nextAppointments)
-    alert(`🎉 Token #${seat} Confirmed!\n\nPatient: ${patientType}\nDoctor: ${selectedDoctor.name}\nHospital: ${selectedDoctor.hospital.name}\nDate: ${date} at ${time}\n\nSMS alert sent to your registered mobile.`)
+    alert(`Booking Confirmed! Token #${seat}\n\nPatient: ${patientType}\nDoctor: ${selectedDoctor.name}\nHospital: ${selectedDoctor.hospital.name}\nDate: ${date} at ${time}\n\nSMS alert sent to your registered mobile.`)
     resetForm()
   }
 
@@ -816,7 +822,7 @@ function App() {
             Ambulance
           </button>
           <div id="userProfile" className="user-pill" style={{ display: currentUser ? 'inline-flex' : 'none' }}>
-            <span>👤</span>
+            <span></span>
             <span id="userNameText">{currentUser?.name || 'Guest'}</span>
           </div>
           <button
@@ -842,14 +848,14 @@ function App() {
           </div>
           <section className="location-finder-card" aria-label="Find nearest hospital">
             <div className="location-finder-copy">
-              <span className="location-pin-icon" aria-hidden="true">⌖</span>
+              <span className="location-pin-icon" aria-hidden="true"></span>
               <div>
                 <strong>{nearestHospital ? 'Your nearest hospital' : 'Use your location'}</strong>
                 <p>{nearestHospital ? `${nearestHospital.name} is approximately ${nearestHospital.distance.toFixed(1)} km away.` : 'Turn on Location Services, allow browser access, and share your current location.'}</p>
               </div>
             </div>
             <button type="button" className="location-share-button" onClick={handleFindNearestHospital} disabled={isLocatingUser}>
-              {isLocatingUser ? 'Finding hospitals…' : userLocation ? 'Update my location' : 'Share my location'}
+              {isLocatingUser ? 'Finding hospitals...' : userLocation ? 'Update my location' : 'Share my location'}
             </button>
           </section>
           {!userLocation && !locationError && (
@@ -865,9 +871,9 @@ function App() {
               <div>
                 <p className="booking-kicker">Recommended for you</p>
                 <h2>{nearestHospital.name}</h2>
-                <p>{nearestHospital.location} · {nearestHospital.distance.toFixed(1)} km away</p>
+                <p>{nearestHospital.location} | {nearestHospital.distance.toFixed(1)} km away</p>
               </div>
-              <a className="directions-button" href={`https://www.google.com/maps/dir/?api=1&origin=${userLocation.latitude},${userLocation.longitude}&destination=${nearestHospital.latitude},${nearestHospital.longitude}`} target="_blank" rel="noopener noreferrer">Get directions ↗</a>
+              <a className="directions-button" href={`https://www.google.com/maps/dir/?api=1&origin=${userLocation.latitude},${userLocation.longitude}&destination=${nearestHospital.latitude},${nearestHospital.longitude}`} target="_blank" rel="noopener noreferrer">Get directions </a>
             </section>
           )}
           <section className="closest-hospitals-card" aria-label="Three closest hospitals">
@@ -888,7 +894,7 @@ function App() {
                       <span className="hospital-rank">{index + 1}</span>
                       <div className="closest-hospital-info">
                         <strong>{hospital.name}</strong>
-                        <p>{hospital.location} · {hospital.distance.toFixed(1)} km away</p>
+                        <p>{hospital.location}  {hospital.distance.toFixed(1)} km away</p>
                         <span className={sharedAmbulance ? 'ambulance-availability available' : 'ambulance-availability'}>
                           {sharedAmbulance ? 'Ambulance available now' : 'No shared ambulance currently'}
                         </span>
@@ -939,10 +945,10 @@ function App() {
                         <div className="shared-ambulance-icon">+</div>
                         <div>
                           <strong>{ambulance.hospital} ambulance</strong>
-                          <p>Driver ID · +91 {ambulance.phone} · Location shared now</p>
+                          <p>Driver ID  +91 {ambulance.phone}  Location shared now</p>
                           <p>{ambulance.latitude.toFixed(5)}, {ambulance.longitude.toFixed(5)}</p>
                         </div>
-                        <a className="location-link" href={`https://www.google.com/maps/dir/?api=1&destination=${ambulance.latitude},${ambulance.longitude}`} target="_blank" rel="noopener noreferrer">Open ambulance location ↗</a>
+                        <a className="location-link" href={`https://www.google.com/maps/dir/?api=1&destination=${ambulance.latitude},${ambulance.longitude}`} target="_blank" rel="noopener noreferrer">Open ambulance location </a>
                       </article>
                     ))}
                   </div>
@@ -998,7 +1004,7 @@ function App() {
                 <div>
                   <p className="ambulance-card-kicker">Driver signed in</p>
                   <h2>{ambulanceDriver.hospital}</h2>
-                  <p className="admin-description">Driver ID · +91 {ambulanceDriver.phone}</p>
+                  <p className="admin-description">Driver ID  +91 {ambulanceDriver.phone}</p>
                 </div>
                 <button type="button" className="auth-btn" onClick={handleAmbulanceLogout}>Sign out</button>
               </div>
@@ -1029,12 +1035,12 @@ function App() {
                       <article className="driver-request" key={request.id}>
                         <div>
                           <strong>{request.patientName}</strong>
-                          <p>{request.patientPhone} · {request.status === 'accepted' ? 'Accepted' : 'Waiting for response'}</p>
+                          <p>{request.patientPhone}  {request.status === 'accepted' ? 'Accepted' : 'Waiting for response'}</p>
                           <p className="request-coordinates">Live location: {request.latitude.toFixed(5)}, {request.longitude.toFixed(5)}</p>
                           <small>Updated {new Date(request.updatedAt).toLocaleTimeString()}</small>
                         </div>
                         <div className="driver-request-actions">
-                          <a className="location-link" href={`https://www.google.com/maps/dir/?api=1&destination=${request.latitude},${request.longitude}`} target="_blank" rel="noopener noreferrer">Navigate ↗</a>
+                          <a className="location-link" href={`https://www.google.com/maps/dir/?api=1&destination=${request.latitude},${request.longitude}`} target="_blank" rel="noopener noreferrer">Navigate </a>
                           {request.status !== 'accepted' && (
                             <button type="button" className="btn btn-primary" onClick={() => handleAmbulanceRequestStatus(request.id, 'accepted')}>Accept request</button>
                           )}
@@ -1072,7 +1078,7 @@ function App() {
                             <div className="shared-ambulance-icon">+</div>
                             <div>
                               <strong>Patient location shared</strong>
-                              <p>{patientRequest.patientName} · Live location updates enabled</p>
+                              <p>{patientRequest.patientName}  Live location updates enabled</p>
                             </div>
                             <span className="live-badge"><span /> TRACKING</span>
                           </div>
@@ -1085,7 +1091,7 @@ function App() {
                           />
                           <div className="shared-ambulance-location-footer">
                             <span>{patientRequest.latitude.toFixed(5)}, {patientRequest.longitude.toFixed(5)}</span>
-                            <a className="location-link" href={`https://www.google.com/maps/dir/?api=1&destination=${patientRequest.latitude},${patientRequest.longitude}`} target="_blank" rel="noopener noreferrer">Navigate to patient ↗</a>
+                            <a className="location-link" href={`https://www.google.com/maps/dir/?api=1&destination=${patientRequest.latitude},${patientRequest.longitude}`} target="_blank" rel="noopener noreferrer">Navigate to patient </a>
                           </div>
                         </>
                       ) : (
@@ -1093,9 +1099,9 @@ function App() {
                           <div className="shared-ambulance-icon">+</div>
                           <div>
                             <strong>{ambulance.hospital} ambulance</strong>
-                            <p>Driver available · Location shared just now</p>
+                            <p>Driver available  Location shared just now</p>
                           </div>
-                          <a className="location-link" href={`https://www.google.com/maps?q=${ambulance.latitude},${ambulance.longitude}`} target="_blank" rel="noopener noreferrer">Open map ↗</a>
+                          <a className="location-link" href={`https://www.google.com/maps?q=${ambulance.latitude},${ambulance.longitude}`} target="_blank" rel="noopener noreferrer">Open map </a>
                         </>
                       )}
                     </article>
@@ -1103,7 +1109,7 @@ function App() {
                 })}
               </div>
             ) : (
-              <div className="ambulance-empty-state"><span aria-hidden="true">⌖</span><p>No ambulance locations are being shared right now.</p></div>
+              <div className="ambulance-empty-state"><span aria-hidden="true"></span><p>No ambulance locations are being shared right now.</p></div>
             )}
           </section>
         </main>
@@ -1141,7 +1147,7 @@ function App() {
                 <tbody>
                   {[...appointments].sort((a, b) => `${a.date} ${a.time}`.localeCompare(`${b.date} ${b.time}`)).map((appointment) => (
                     <tr key={appointment.id}>
-                      <td><strong>{appointment.patientName}</strong><span>{appointment.patientAge} years · For {appointment.patientType}</span></td>
+                      <td><strong>{appointment.patientName}</strong><span>{appointment.patientAge} years  For {appointment.patientType}</span></td>
                       <td>{appointment.patientEmail || 'Not provided'}</td>
                       <td><strong>{appointment.doctorName}</strong><span>{appointment.hospital}</span></td>
                       <td><strong>{appointment.date}</strong><span>{appointment.time}</span></td>
@@ -1165,24 +1171,24 @@ function App() {
                 <h1>Better care starts with a <em>simpler visit.</em></h1>
                 <p className="landing-lede">Find trusted specialists, choose a convenient OPD slot, and reserve your token before you arrive.</p>
                 <div className="landing-actions">
-                  <button type="button" className="landing-cta" onClick={() => setCurrentPage('booking')}>Book an appointment <span aria-hidden="true">↗</span></button>
-                  <a className="landing-secondary" href="#services">Explore the experience <span aria-hidden="true">↓</span></a>
+                  <button type="button" className="landing-cta" onClick={() => setCurrentPage('booking')}>Book an appointment <span aria-hidden="true"></span></button>
+                  <a className="landing-secondary" href="#services">Explore the experience <span aria-hidden="true"></span></a>
                 </div>
                 <div className="landing-proof">
                   <div className="proof-avatars" aria-hidden="true"><span>PN</span><span>RM</span><span>SK</span></div>
-                  <p><strong>Trusted by patients across Coimbatore</strong><br /><span>Real specialists · Live OPD availability</span></p>
+                  <p><strong>Trusted by patients across Coimbatore</strong><br /><span>Real specialists  Live OPD availability</span></p>
                 </div>
               </div>
               <div className="landing-art" aria-label="MediConnect appointment illustration">
                 <div className="art-glow" />
-                <div className="art-card art-card-top"><span className="art-icon">✓</span><div><strong>Appointment confirmed</strong><small>Today, 10:00 AM</small></div></div>
+                <div className="art-card art-card-top"><span className="art-icon"></span><div><strong>Appointment confirmed</strong><small>Today, 10:00 AM</small></div></div>
                 <div className="art-card art-card-bottom"><span className="pulse-dot" /><div><strong>Live token updates</strong><small>Know before you go</small></div></div>
               </div>
             </section>
 
             <section className="service-strip" id="services" aria-label="Locate hospitals">
               <button type="button" className="hospital-locator-button" onClick={() => setCurrentPage('hospitals')}>
-                Locate hospitals <span aria-hidden="true">↗</span>
+                Locate hospitals <span aria-hidden="true"></span>
               </button>
             </section>
           </main>
@@ -1196,26 +1202,26 @@ function App() {
             <p>Select a specialty and doctor to see the next available visit.</p>
           </div>
           <div className="location-bar">
-            📍 <span id="locationText">Coimbatore, Tamil Nadu</span>
+             <span id="locationText">Coimbatore, Tamil Nadu</span>
           </div>
         </div>
 
         <div className="queue-ticker">
           <div>
-            <span className="queue-live-tag">● Live OPD</span>
+            <span className="queue-live-tag"> Live OPD</span>
             <span>Coimbatore OPD Central: <strong style={{ color: '#38bdf8' }}>Token #4</strong> in Consultation</span>
           </div>
-          <div style={{ color: '#94a3b8', fontSize: '11px' }}>⏱ Avg Consultation: ~6 mins</div>
+          <div style={{ color: '#94a3b8', fontSize: '11px' }}> Avg Consultation: ~6 mins</div>
         </div>
 
         <div className="booking-layout">
           <div className="booking-form-column">
             <div className="symptom-section">
-              <div className="section-title">⚡ Quick Symptom Matcher (Click to auto-select)</div>
+              <div className="section-title"> Quick Symptom Matcher (Click to auto-select)</div>
               <div className="chip-grid">
-                <div className="s-chip" onClick={() => handleSymptomMatch('ENT')}>👂 Ear / Throat Pain</div>
-                <div className="s-chip" onClick={() => handleSymptomMatch('CARDIOLOGY')}>❤️ Chest Pain / High BP</div>
-                <div className="s-chip" onClick={() => handleSymptomMatch('NEUROSURGERY')}>🧠 Headache / Spine Pain</div>
+                <div className="s-chip" onClick={() => handleSymptomMatch('ENT')}> Ear / Throat Pain</div>
+                <div className="s-chip" onClick={() => handleSymptomMatch('CARDIOLOGY')}> Chest Pain / High BP</div>
+                <div className="s-chip" onClick={() => handleSymptomMatch('NEUROSURGERY')}> Headache / Spine Pain</div>
               </div>
             </div>
             <main className="card">
@@ -1262,7 +1268,7 @@ function App() {
           <select value={hospitalName} onChange={handleHospitalChange} aria-label="Select hospital branch">
             <option value="">-- Choose Hospital Branch --</option>
             {hospitalBranches.map((hospital) => (
-              <option key={hospital.name} value={hospital.name}>{hospital.name} · {hospital.location}</option>
+              <option key={hospital.name} value={hospital.name}>{hospital.name}  {hospital.location}</option>
             ))}
           </select>
 
@@ -1287,8 +1293,8 @@ function App() {
           </select>
           {selectedDoctor && (
             <div className="doctor-details-box" style={{ display: 'block' }}>
-              <div>🏥 <strong>{selectedDoctor.hospital.name}</strong> · {selectedDoctor.hospital.location}</div>
-              <div>🕒 <strong>OPD Timings:</strong> {selectedDoctor.schedule}</div>
+              <div> <strong>{selectedDoctor.hospital.name}</strong>  {selectedDoctor.hospital.location}</div>
+              <div> <strong>OPD Timings:</strong> {selectedDoctor.schedule}</div>
             </div>
           )}
 
@@ -1302,7 +1308,7 @@ function App() {
           />
           {dayOfWeek === 0 && (
             <div id="sundayNotice" style={{ display: 'block', color: 'var(--danger)', fontSize: '12px', fontWeight: 700, marginTop: '6px' }}>
-              ⚠️ Outpatient clinics are closed on Sundays. Emergency OPD is open 24/7.
+               Outpatient clinics are closed on Sundays. Emergency OPD is open 24/7.
             </div>
           )}
 
@@ -1322,7 +1328,7 @@ function App() {
                     >
                       {expired ? (
                         <>
-                          ⏱ {slotValue}
+                           {slotValue}
                           <br />
                           <small>Closed</small>
                         </>
@@ -1339,7 +1345,7 @@ function App() {
           {time && (
             <div id="seatArea" style={{ display: 'block' }}>
               <div className="seat-header">
-                <span>🪑 6. Token / Seat Assignment</span>
+                <span> 6. Token / Seat Assignment</span>
                 <span id="seatCountBadge" style={{ color: 'var(--primary)' }}>{availableSeatCount} Available</span>
               </div>
               <div id="seatGrid" className="seat-grid">
@@ -1365,7 +1371,7 @@ function App() {
                 <div className="legend-item"><div className="legend-dot" style={{ background: 'var(--booked)' }}></div> Booked</div>
               </div>
               <button id="payStepBtn" className="btn btn-primary" style={{ marginTop: '14px' }} onClick={handleShowPayment} disabled={seat === null}>
-                Proceed to Token Payment →
+                Proceed to Token Payment 
               </button>
             </div>
           )}
@@ -1376,7 +1382,7 @@ function App() {
                 <div className="summary-item"><strong>Patient Profile</strong>{patientName || patientType} ({patientAge} Yrs)</div>
                 <div className="summary-item"><strong>Doctor</strong>{selectedDoctor.name}</div>
                 <div className="summary-item"><strong>Hospital</strong>{selectedDoctor.hospital.name}</div>
-                <div className="summary-item"><strong>Date &amp; Slot</strong>{date} · {time}</div>
+                <div className="summary-item"><strong>Date &amp; Slot</strong>{date}  {time}</div>
                 <div className="summary-item"><strong>Token Assigned</strong>Token #{seat}</div>
                 <div className="summary-item"><strong>OPD Status</strong>On Schedule</div>
               </div>
@@ -1394,7 +1400,7 @@ function App() {
 
               {paymentMethod === 'online' && (
                 <>
-                  <div className="gpay-badge">💳 Google Pay / PhonePe UPI</div>
+                  <div className="gpay-badge"> Google Pay / PhonePe UPI</div>
                   <div id="qrContainer">
                     <img src={qrImage} alt="UPI QR" style={{ borderRadius: '8px', width: '160px', height: '160px' }} />
                   </div>
@@ -1431,19 +1437,52 @@ function App() {
         </div>
 
         <div className="footer">
-          © 2026 MediConnect · <a className="medai-footer-button" href="https://jeevinth008-pixel.github.io/Mediconnect/" target="_blank" rel="noopener noreferrer">MedAI</a>
+           2026 MediConnect  <a className="medai-footer-button" href="https://jeevinth008-pixel.github.io/Mediconnect/" target="_blank" rel="noopener noreferrer">MedAI</a>
         </div>
       </div>
       )}
 
       <div id="authModal" className="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="authTitle" style={{ display: isAuthOpen ? 'grid' : 'none' }}>
         <div className="modal-card">
-          <button className="modal-close" type="button" aria-label="Close sign in" onClick={() => setIsAuthOpen(false)}>✕</button>
+          <button className="modal-close" type="button" aria-label="Close sign in" onClick={() => setIsAuthOpen(false)}></button>
           <p className="modal-kicker">MediConnect account</p>
           <h3 id="authTitle">Patient Sign In</h3>
           <p className="modal-copy">Sign in to keep your appointments and patient details together.</p>
           <form onSubmit={handleLogin}>
             <div className="auth-field">
+              <div className="auth-field">
+                <label htmlFor="patientName">Full Name</label>
+                <input type="text" id="patientName" placeholder="Enter patient name" required value={patientName} onChange={(e) => setPatientName(e.target.value)} />
+              </div>
+              <div className="auth-field">
+                <label htmlFor="patientAge">Age</label>
+                <input type="number" id="patientAge" min="1" max="120" required value={patientAge} onChange={(e) => setPatientAge(e.target.value)} />
+              </div>
+              <div className="auth-field">
+                <label htmlFor="patientGender">Gender</label>
+                <select id="patientGender" required value={patientGender} onChange={(e) => setPatientGender(e.target.value)}>
+                  <option value="">Select gender</option>
+                  <option value="Female">Female</option>
+                  <option value="Male">Male</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+              <div className="auth-field">
+                <label htmlFor="patientAddress">Address</label>
+                <textarea id="patientAddress" placeholder="Enter your address" required value={patientAddress} onChange={(e) => setPatientAddress(e.target.value)} />
+              </div>
+              <div className="auth-field">
+                <label htmlFor="profilePhoto">Profile Photo (Optional, max 1 MB)</label>
+                <input type="file" id="profilePhoto" accept="image/*" onChange={(e) => {
+                  const file = e.target.files?.[0]
+                  if (!file) return
+                  if (file.size > 1024 * 1024) { setLoginError('Photo must be smaller than 1 MB.'); e.target.value = ''; return }
+                  const reader = new FileReader()
+                  reader.onload = () => setProfilePhoto(reader.result)
+                  reader.readAsDataURL(file)
+                  setLoginError('')
+                }} />
+              </div>
               <label htmlFor="loginId">Email or mobile</label>
               <input type="text" id="loginId" placeholder="name@domain.com" autoComplete="username" required value={loginInput} onChange={(e) => { setLoginInput(e.target.value); setLoginError('') }} />
             </div>
