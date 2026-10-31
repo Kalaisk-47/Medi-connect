@@ -1,0 +1,14 @@
+[1mdiff --git a/src/App.jsx b/src/App.jsx[m
+[1mindex b0734eb..21fe049 100644[m
+[1m--- a/src/App.jsx[m
+[1m+++ b/src/App.jsx[m
+[36m@@ -1196,8 +1196,7 @@[m [mfunction App() {[m
+         </div>[m
+ [m
+         <div className="footer">[m
+[31m-          © 2026 MediConnect · <a className="medai-footer-button" href="https://jeevinth008-pixel.github.io/Mediconnect/" target="_blank" rel="noopener noreferrer">MedAI</a>[m
+[31m-        </div>[m
+[32m+[m[32m          © 2026 MediConnect · <a className="medai-footer-button" href="https://medi-connect-chatbot.onrender.com" target="_blank" rel="noopener noreferrer">MedAI</a>[m
+       </div>[m
+       )}[m
+ [m

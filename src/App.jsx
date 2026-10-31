@@ -27,9 +27,19 @@ const TOTAL_SEATS = 10
 const ADMIN_CREDENTIALS = { email: 'admin@mediconnect.com', password: 'Admin@123' }
 const PRESCRIPTION_DB_NAME = 'mediconnect-prescriptions'
 const PRESCRIPTION_STORE_NAME = 'attachments'
-const readAppointments = () => {
+const hospitalBranches = [
+  { name: 'PSG Hospitals', location: 'Peelamedu, Coimbatore' },
+  { name: 'Sri Ramakrishna Hospital', location: 'Siddhapudur, Coimbatore' },
+  { name: 'KMCH', location: 'Avinashi Road, Coimbatore' },
+  { name: 'Ganga Hospital', location: 'Swarnambika Layout, Coimbatore' }
+]
+
+const hospitalStorageKey = (hospitalName) => `mediconnect_appointments_${normalizeHospitalName(hospitalName)}`
+
+const readHospitalAppointments = (hospitalName) => {
+  if (!hospitalName) return []
   try {
-    return JSON.parse(localStorage.getItem('mediconnect_appointments') || '[]')
+    return JSON.parse(localStorage.getItem(hospitalStorageKey(hospitalName)) || '[]')
   } catch {
     return []
   }
@@ -46,6 +56,14 @@ const readAmbulanceDriver = () => {
 const readSharedAmbulances = () => {
   try {
     return JSON.parse(localStorage.getItem('mediconnect_shared_ambulances') || '[]')
+  } catch {
+    return []
+  }
+}
+
+const readAmbulanceRequests = () => {
+  try {
+    return JSON.parse(localStorage.getItem('mediconnect_ambulance_requests') || '[]')
   } catch {
     return []
   }
@@ -195,7 +213,7 @@ function PrescriptionPreview({ attachment, onClose }) {
       <section className="prescription-preview-dialog" role="dialog" aria-modal="true" aria-label={`Preview ${attachment.name}`}>
         <div className="prescription-preview-header">
           <strong>{attachment.name}</strong>
-          <button type="button" className="prescription-remove-button" onClick={onClose} aria-label="Close prescription preview">×</button>
+          <button type="button" className="prescription-remove-button" onClick={onClose} aria-label="Close prescription preview"></button>
         </div>
         {attachment.type.startsWith('image/') ? (
           <img className="prescription-full-preview" src={previewUrl} alt={attachment.name} />
@@ -261,7 +279,7 @@ function PrescriptionAttachments() {
   return (
     <aside className="prescriptions-panel" aria-label="Prescription attachments">
       <div className="prescriptions-heading">
-        <span className="prescriptions-icon" aria-hidden="true">＋</span>
+        <span className="prescriptions-icon" aria-hidden="true"></span>
         <div>
           <h2>Prescriptions</h2>
           <p>Keep your medical documents handy.</p>
@@ -277,12 +295,12 @@ function PrescriptionAttachments() {
         aria-label="Choose prescription images or PDF files"
       />
       <button type="button" className="prescription-add-button" onClick={() => fileInputRef.current?.click()}>
-        <span aria-hidden="true">＋</span> Add prescriptions
+        <span aria-hidden="true">+</span> Add prescriptions
       </button>
       <p className="prescriptions-storage-note">Images and PDFs are saved on this device.</p>
       {storageError && <p className="prescriptions-error" role="alert">{storageError}</p>}
       {isLoading ? (
-        <p className="prescriptions-empty" role="status">Loading saved prescriptions…</p>
+        <p className="prescriptions-empty" role="status">Loading saved prescriptions...</p>
       ) : attachments.length ? (
         <ul className="prescription-list">
           {attachments.map((attachment) => (
@@ -295,7 +313,7 @@ function PrescriptionAttachments() {
                 )}
                 <span className="prescription-file-name">{attachment.name}</span>
               </button>
-              <button type="button" className="prescription-remove-button" onClick={() => handleDelete(attachment.id)} aria-label={`Remove ${attachment.name}`}>×</button>
+              <button type="button" className="prescription-remove-button" onClick={() => handleDelete(attachment.id)} aria-label={`Remove ${attachment.name}`}></button>
             </li>
           ))}
         </ul>
@@ -308,6 +326,7 @@ function PrescriptionAttachments() {
 }
 
 function App() {
+  const [hospitalName, setHospitalName] = useState('')
   const [specialty, setSpecialty] = useState('')
   const [doctorId, setDoctorId] = useState('')
   const [patientType, setPatientType] = useState('Myself')
@@ -316,6 +335,9 @@ function App() {
     return saved ? JSON.parse(saved).name : ''
   })
   const [patientAge, setPatientAge] = useState('26')
+  const [patientGender, setPatientGender] = useState('')
+  const [patientAddress, setPatientAddress] = useState('')
+  const [profilePhoto, setProfilePhoto] = useState('')
   const [date, setDate] = useState('')
   const [time, setTime] = useState('')
   const [seat, setSeat] = useState(null)
@@ -326,16 +348,20 @@ function App() {
   const [currentPage, setCurrentPage] = useState('home')
   const [isAuthOpen, setIsAuthOpen] = useState(false)
   const [loginInput, setLoginInput] = useState('')
-  const [appointments, setAppointments] = useState(readAppointments)
+  const [appointments, setAppointments] = useState(() => readHospitalAppointments(localStorage.getItem('mediconnect_admin_hospital') || ''))
   const [adminUser, setAdminUser] = useState(() => localStorage.getItem('mediconnect_admin') === 'true')
+  const [adminHospital, setAdminHospital] = useState(() => localStorage.getItem('mediconnect_admin_hospital') || '')
   const [adminEmail, setAdminEmail] = useState('')
   const [adminPassword, setAdminPassword] = useState('')
   const [adminLoginError, setAdminLoginError] = useState('')
+  const [loginPassword, setLoginPassword] = useState('')
+  const [loginError, setLoginError] = useState('')
   const [ambulanceDriver, setAmbulanceDriver] = useState(readAmbulanceDriver)
   const [ambulancePhone, setAmbulancePhone] = useState('')
   const [ambulanceHospital, setAmbulanceHospital] = useState('')
   const [ambulanceError, setAmbulanceError] = useState('')
   const [sharedAmbulances, setSharedAmbulances] = useState(readSharedAmbulances)
+  const [ambulanceRequests, setAmbulanceRequests] = useState(readAmbulanceRequests)
   const [isSharingLocation, setIsSharingLocation] = useState(() => readSharedAmbulances().length > 0)
   const [userLocation, setUserLocation] = useState(null)
   const [locationError, setLocationError] = useState('')
@@ -346,6 +372,8 @@ function App() {
     const saved = localStorage.getItem('mediconnect_user')
     return saved ? JSON.parse(saved) : null
   })
+  const patientLocationWatchRef = useRef(null)
+  const activeAmbulanceRequestIdRef = useRef(null)
 
   useEffect(() => {
     const minDate = getLocalDateString()
@@ -353,24 +381,71 @@ function App() {
     if (dateInput) dateInput.min = minDate
   }, [])
 
+  useEffect(() => {
+    const syncAmbulanceData = () => {
+      setSharedAmbulances(readSharedAmbulances())
+      const nextRequests = readAmbulanceRequests()
+      setAmbulanceRequests(nextRequests)
+      const activeRequest = nextRequests.find((request) => request.id === activeAmbulanceRequestIdRef.current)
+      if (activeAmbulanceRequestIdRef.current && (!activeRequest || activeRequest.status === 'completed')) {
+        if (patientLocationWatchRef.current !== null && navigator.geolocation) {
+          navigator.geolocation.clearWatch(patientLocationWatchRef.current)
+        }
+        patientLocationWatchRef.current = null
+        activeAmbulanceRequestIdRef.current = null
+      }
+    }
+    window.addEventListener('storage', syncAmbulanceData)
+    const refreshTimer = window.setInterval(syncAmbulanceData, 3000)
+    return () => {
+      window.removeEventListener('storage', syncAmbulanceData)
+      window.clearInterval(refreshTimer)
+    }
+  }, [])
+
+  useEffect(() => () => {
+    if (patientLocationWatchRef.current !== null && navigator.geolocation) {
+      navigator.geolocation.clearWatch(patientLocationWatchRef.current)
+    }
+  }, [])
+
   const selectedDoctor = useMemo(
-    () => (specialty ? doctors[specialty].find((d) => d.id === doctorId) : null),
-    [specialty, doctorId]
+    () => (specialty ? doctors[specialty].find((d) => d.id === doctorId && d.hospital.name === hospitalName) : null),
+    [specialty, doctorId, hospitalName]
   )
 
   const bookedSeats = useMemo(() => {
     if (!selectedDoctor || !date || !time) return []
     const storedSeats = appointments
-      .filter((appointment) => appointment.doctorId === selectedDoctor.id && appointment.date === date && appointment.time === time)
+      .filter((appointment) => appointment.hospital === hospitalName && appointment.doctorId === selectedDoctor.id && appointment.date === date && appointment.time === time)
       .map((appointment) => appointment.seat)
     return [...new Set([...getDeterministicBookedSeats(selectedDoctor.id, date, time), ...storedSeats])]
-  }, [selectedDoctor, date, time, appointments])
+  }, [selectedDoctor, hospitalName, date, time, appointments])
 
   const availableSeatCount = TOTAL_SEATS - bookedSeats.length
   const canSubmitAppointment = paymentMethod === 'hospital' || (paymentMethod === 'online' && paymentVerified)
 
   const handleSymptomMatch = (specKey) => {
+    if (!hospitalName) {
+      alert('Please select a hospital branch first.')
+      return
+    }
     setSpecialty(specKey)
+    setDoctorId('')
+    setDate('')
+    setTime('')
+    setSeat(null)
+    setShowPayment(false)
+    setPaymentMethod('')
+    setUtr('')
+    setPaymentVerified(false)
+  }
+
+  const handleHospitalChange = (event) => {
+    const nextHospitalName = event.target.value
+    setHospitalName(nextHospitalName)
+    setAppointments(readHospitalAppointments(nextHospitalName))
+    setSpecialty('')
     setDoctorId('')
     setDate('')
     setTime('')
@@ -431,12 +506,30 @@ function App() {
   const handleLogin = (event) => {
     event.preventDefault()
     const identifier = loginInput.trim()
-    const nextUser = { name: identifier.split('@')[0] || 'Patient', email: identifier }
+    const password = loginPassword.trim()
+    const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(identifier)
+    const isMobile = /^\+?[0-9\s-]{10,}$/.test(identifier)
+
+    if (!isEmail && !isMobile) {
+      setLoginError('Enter a valid email address or mobile number.')
+      return
+    }
+    if (password.length < 6) {
+      setLoginError('Password must be at least 6 characters.')
+      return
+    }
+
+    if (!patientName.trim()) { setLoginError('Enter patient name.'); return }
+    if (!patientAge || Number(patientAge) < 1 || Number(patientAge) > 120) { setLoginError('Enter a valid age.'); return }
+    if (!patientGender || !patientAddress.trim()) { setLoginError('Complete all patient details.'); return }
+    const nextUser = { name: patientName.trim(), age: Number(patientAge), gender: patientGender, address: patientAddress.trim(), photo: profilePhoto, email: identifier }
     localStorage.setItem('mediconnect_user', JSON.stringify(nextUser))
     setCurrentUser(nextUser)
     setPatientName(nextUser.name)
     setIsAuthOpen(false)
     setLoginInput('')
+    setLoginPassword('')
+    setLoginError('')
   }
 
   const handleLogout = () => {
@@ -447,7 +540,7 @@ function App() {
   const handleVerify = () => {
     const cleanUtr = utr.trim()
     if (cleanUtr.length !== 12 || !/^\d{12}$/.test(cleanUtr)) {
-      alert('⚠️ Please enter a valid 12-digit UPI UTR / Transaction Reference Number.')
+      alert('Please enter a valid 12-digit UPI UTR / Transaction Reference Number.')
       return
     }
     setPaymentVerified(true)
@@ -475,20 +568,24 @@ function App() {
       createdAt: new Date().toISOString()
     }
     const nextAppointments = [...appointments, appointment]
-    localStorage.setItem('mediconnect_appointments', JSON.stringify(nextAppointments))
+    localStorage.setItem(hospitalStorageKey(hospitalName), JSON.stringify(nextAppointments))
     setAppointments(nextAppointments)
-    alert(`🎉 Token #${seat} Confirmed!\n\nPatient: ${patientType}\nDoctor: ${selectedDoctor.name}\nHospital: ${selectedDoctor.hospital.name}\nDate: ${date} at ${time}\n\nSMS alert sent to your registered mobile.`)
+    alert(`Booking Confirmed! Token #${seat}\n\nPatient: ${patientType}\nDoctor: ${selectedDoctor.name}\nHospital: ${selectedDoctor.hospital.name}\nDate: ${date} at ${time}\n\nSMS alert sent to your registered mobile.`)
     resetForm()
   }
 
   const handleAdminLogin = (event) => {
     event.preventDefault()
-    if (adminEmail.trim().toLowerCase() !== ADMIN_CREDENTIALS.email || adminPassword !== ADMIN_CREDENTIALS.password) {
-      setAdminLoginError('The email or password is incorrect.')
+    const matchedHospital = hospitalBranches.find((hospital) => normalizeHospitalName(hospital.name) === normalizeHospitalName(adminEmail.trim()))
+    if (!matchedHospital || adminPassword !== ADMIN_CREDENTIALS.password) {
+      setAdminLoginError('Enter a hospital name from the booking list and the correct admin password.')
       return
     }
     localStorage.setItem('mediconnect_admin', 'true')
+    localStorage.setItem('mediconnect_admin_hospital', matchedHospital.name)
     setAdminUser(true)
+    setAdminHospital(matchedHospital.name)
+    setAppointments(readHospitalAppointments(matchedHospital.name))
     setAdminLoginError('')
     setAdminEmail('')
     setAdminPassword('')
@@ -497,7 +594,10 @@ function App() {
 
   const handleAdminLogout = () => {
     localStorage.removeItem('mediconnect_admin')
+    localStorage.removeItem('mediconnect_admin_hospital')
     setAdminUser(false)
+    setAdminHospital('')
+    setAppointments([])
     setCurrentPage('home')
   }
 
@@ -551,6 +651,66 @@ function App() {
     setIsSharingLocation(false)
   }
 
+  const updateAmbulanceRequestLocation = (requestId, latitude, longitude) => {
+    const requests = readAmbulanceRequests()
+    const nextRequests = requests.map((request) => request.id === requestId
+      ? { ...request, latitude, longitude, updatedAt: new Date().toISOString() }
+      : request)
+    localStorage.setItem('mediconnect_ambulance_requests', JSON.stringify(nextRequests))
+    setAmbulanceRequests(nextRequests)
+  }
+
+  const handleCallAmbulance = (ambulance) => {
+    if (!navigator.geolocation) {
+      setLocationError('Location access is not supported by this browser. Please call the ambulance directly.')
+      setVisibleAmbulancePhone(ambulance.phone)
+      return
+    }
+    setLocationError('')
+    setVisibleAmbulancePhone(ambulance.phone)
+    navigator.geolocation.getCurrentPosition(
+      ({ coords }) => {
+        const request = {
+          id: `${Date.now()}-${ambulance.phone}`,
+          ambulancePhone: ambulance.phone,
+          hospital: ambulance.hospital,
+          patientName: currentUser?.name || patientName.trim() || 'Patient',
+          patientPhone: currentUser?.email || 'Not provided',
+          latitude: coords.latitude,
+          longitude: coords.longitude,
+          status: 'pending',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        }
+        const nextRequests = [...readAmbulanceRequests(), request]
+        localStorage.setItem('mediconnect_ambulance_requests', JSON.stringify(nextRequests))
+        setAmbulanceRequests(nextRequests)
+        setUserLocation({ latitude: coords.latitude, longitude: coords.longitude })
+        activeAmbulanceRequestIdRef.current = request.id
+        if (patientLocationWatchRef.current === null && navigator.geolocation.watchPosition) {
+          patientLocationWatchRef.current = navigator.geolocation.watchPosition(
+            ({ coords: updatedCoords }) => {
+              setUserLocation({ latitude: updatedCoords.latitude, longitude: updatedCoords.longitude })
+              updateAmbulanceRequestLocation(request.id, updatedCoords.latitude, updatedCoords.longitude)
+            },
+            () => setLocationError('Live tracking was interrupted. The driver can still use your last shared location.'),
+            { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 }
+          )
+        }
+      },
+      () => setLocationError('Location permission was not granted. Please allow access so the driver can find you, then try again.'),
+      { enableHighAccuracy: true, timeout: 10000 }
+    )
+  }
+
+  const handleAmbulanceRequestStatus = (requestId, status) => {
+    const nextRequests = readAmbulanceRequests().map((request) => request.id === requestId
+      ? { ...request, status, updatedAt: new Date().toISOString() }
+      : request)
+    localStorage.setItem('mediconnect_ambulance_requests', JSON.stringify(nextRequests))
+    setAmbulanceRequests(nextRequests)
+  }
+
   const handleAmbulanceLogout = () => {
     handleStopSharingLocation()
     localStorage.removeItem('mediconnect_ambulance_driver')
@@ -598,12 +758,14 @@ function App() {
     setPaymentVerified(false)
     setIsAuthOpen(false)
     setLoginInput('')
+    setLoginPassword('')
+    setLoginError('')
   }
 
-  const doctorList = specialty ? doctors[specialty] : []
+  const doctorList = specialty ? doctors[specialty].filter((doctor) => doctor.hospital.name === hospitalName) : []
   const dayOfWeek = date ? new Date(`${date}T00:00:00`).getDay() : null
   const isToday = date === getLocalDateString()
-  const qrImage = '/payment-qr.svg'
+  const qrImage = `${import.meta.env.BASE_URL}payment-qr.svg`
   const nearestHospital = userLocation
     ? nearbyHospitals
       .map((hospital) => ({
@@ -627,6 +789,9 @@ function App() {
   const ambulanceMapUrl = sharedAmbulances.length
     ? `https://www.google.com/maps?q=${sharedAmbulances[0].latitude},${sharedAmbulances[0].longitude}&output=embed`
     : ''
+  const driverRequests = ambulanceDriver
+    ? ambulanceRequests.filter((request) => normalizeHospitalName(request.hospital) === normalizeHospitalName(ambulanceDriver.hospital) && request.status !== 'completed')
+    : []
 
   return (
     <>
@@ -653,8 +818,11 @@ function App() {
           <button type="button" className="admin-mobile-link" onClick={() => setCurrentPage(adminUser ? 'admin-dashboard' : 'admin-login')}>
             {adminUser ? 'Admin' : 'Admin login'}
           </button>
+          <button type="button" className="ambulance-mobile-link" onClick={() => setCurrentPage('ambulance')}>
+            Ambulance
+          </button>
           <div id="userProfile" className="user-pill" style={{ display: currentUser ? 'inline-flex' : 'none' }}>
-            <span>👤</span>
+            <span></span>
             <span id="userNameText">{currentUser?.name || 'Guest'}</span>
           </div>
           <button
@@ -680,14 +848,14 @@ function App() {
           </div>
           <section className="location-finder-card" aria-label="Find nearest hospital">
             <div className="location-finder-copy">
-              <span className="location-pin-icon" aria-hidden="true">⌖</span>
+              <span className="location-pin-icon" aria-hidden="true"></span>
               <div>
                 <strong>{nearestHospital ? 'Your nearest hospital' : 'Use your location'}</strong>
                 <p>{nearestHospital ? `${nearestHospital.name} is approximately ${nearestHospital.distance.toFixed(1)} km away.` : 'Turn on Location Services, allow browser access, and share your current location.'}</p>
               </div>
             </div>
             <button type="button" className="location-share-button" onClick={handleFindNearestHospital} disabled={isLocatingUser}>
-              {isLocatingUser ? 'Finding hospitals…' : userLocation ? 'Update my location' : 'Share my location'}
+              {isLocatingUser ? 'Finding hospitals...' : userLocation ? 'Update my location' : 'Share my location'}
             </button>
           </section>
           {!userLocation && !locationError && (
@@ -703,9 +871,9 @@ function App() {
               <div>
                 <p className="booking-kicker">Recommended for you</p>
                 <h2>{nearestHospital.name}</h2>
-                <p>{nearestHospital.location} · {nearestHospital.distance.toFixed(1)} km away</p>
+                <p>{nearestHospital.location} | {nearestHospital.distance.toFixed(1)} km away</p>
               </div>
-              <a className="directions-button" href={`https://www.google.com/maps/dir/?api=1&origin=${userLocation.latitude},${userLocation.longitude}&destination=${nearestHospital.latitude},${nearestHospital.longitude}`} target="_blank" rel="noopener noreferrer">Get directions ↗</a>
+              <a className="directions-button" href={`https://www.google.com/maps/dir/?api=1&origin=${userLocation.latitude},${userLocation.longitude}&destination=${nearestHospital.latitude},${nearestHospital.longitude}`} target="_blank" rel="noopener noreferrer">Get directions </a>
             </section>
           )}
           <section className="closest-hospitals-card" aria-label="Three closest hospitals">
@@ -726,7 +894,7 @@ function App() {
                       <span className="hospital-rank">{index + 1}</span>
                       <div className="closest-hospital-info">
                         <strong>{hospital.name}</strong>
-                        <p>{hospital.location} · {hospital.distance.toFixed(1)} km away</p>
+                        <p>{hospital.location}  {hospital.distance.toFixed(1)} km away</p>
                         <span className={sharedAmbulance ? 'ambulance-availability available' : 'ambulance-availability'}>
                           {sharedAmbulance ? 'Ambulance available now' : 'No shared ambulance currently'}
                         </span>
@@ -734,7 +902,7 @@ function App() {
                       <div className="closest-hospital-actions">
                         <a className="directions-button" href={`https://www.google.com/maps/dir/?api=1&origin=${userLocation.latitude},${userLocation.longitude}&destination=${hospital.latitude},${hospital.longitude}`} target="_blank" rel="noopener noreferrer">Directions</a>
                         {sharedAmbulance && (
-                          <button type="button" className="emergency-call-button" onClick={() => setVisibleAmbulancePhone(sharedAmbulance.phone)}>
+                          <button type="button" className="emergency-call-button" onClick={() => handleCallAmbulance(sharedAmbulance)}>
                             Call ambulance
                           </button>
                         )}
@@ -743,6 +911,9 @@ function App() {
                         <div className="ambulance-number-reveal" role="status">
                           <span>Registered ambulance number</span>
                           <strong>+91 {sharedAmbulance.phone}</strong>
+                          {ambulanceRequests.some((request) => request.ambulancePhone === sharedAmbulance.phone && request.status !== 'completed') && (
+                            <small className="ambulance-request-status">Your location is shared with this driver. Live tracking is active.</small>
+                          )}
                           <a href={`tel:+91${sharedAmbulance.phone}`}>Call now</a>
                         </div>
                       )}
@@ -774,10 +945,10 @@ function App() {
                         <div className="shared-ambulance-icon">+</div>
                         <div>
                           <strong>{ambulance.hospital} ambulance</strong>
-                          <p>Driver ID · +91 {ambulance.phone} · Location shared now</p>
+                          <p>Driver ID  +91 {ambulance.phone}  Location shared now</p>
                           <p>{ambulance.latitude.toFixed(5)}, {ambulance.longitude.toFixed(5)}</p>
                         </div>
-                        <a className="location-link" href={`https://www.google.com/maps/dir/?api=1&destination=${ambulance.latitude},${ambulance.longitude}`} target="_blank" rel="noopener noreferrer">Open ambulance location ↗</a>
+                        <a className="location-link" href={`https://www.google.com/maps/dir/?api=1&destination=${ambulance.latitude},${ambulance.longitude}`} target="_blank" rel="noopener noreferrer">Open ambulance location </a>
                       </article>
                     ))}
                   </div>
@@ -833,7 +1004,7 @@ function App() {
                 <div>
                   <p className="ambulance-card-kicker">Driver signed in</p>
                   <h2>{ambulanceDriver.hospital}</h2>
-                  <p className="admin-description">Driver ID · +91 {ambulanceDriver.phone}</p>
+                  <p className="admin-description">Driver ID  +91 {ambulanceDriver.phone}</p>
                 </div>
                 <button type="button" className="auth-btn" onClick={handleAmbulanceLogout}>Sign out</button>
               </div>
@@ -850,6 +1021,38 @@ function App() {
               ) : (
                 <button type="button" className="btn btn-primary" onClick={handleShareLocation}>Share my current location</button>
               )}
+              <section className="driver-request-panel" aria-label="Patient ambulance requests">
+                <div className="ambulance-panel-heading">
+                  <div>
+                    <p className="ambulance-card-kicker">Incoming requests</p>
+                    <h2>{driverRequests.length ? `${driverRequests.length} patient${driverRequests.length === 1 ? '' : 's'} need help` : 'No active patient requests'}</h2>
+                  </div>
+                  <span className="live-badge"><span /> AUTO-REFRESH</span>
+                </div>
+                {driverRequests.length ? (
+                  <div className="driver-request-list">
+                    {driverRequests.map((request) => (
+                      <article className="driver-request" key={request.id}>
+                        <div>
+                          <strong>{request.patientName}</strong>
+                          <p>{request.patientPhone}  {request.status === 'accepted' ? 'Accepted' : 'Waiting for response'}</p>
+                          <p className="request-coordinates">Live location: {request.latitude.toFixed(5)}, {request.longitude.toFixed(5)}</p>
+                          <small>Updated {new Date(request.updatedAt).toLocaleTimeString()}</small>
+                        </div>
+                        <div className="driver-request-actions">
+                          <a className="location-link" href={`https://www.google.com/maps/dir/?api=1&destination=${request.latitude},${request.longitude}`} target="_blank" rel="noopener noreferrer">Navigate </a>
+                          {request.status !== 'accepted' && (
+                            <button type="button" className="btn btn-primary" onClick={() => handleAmbulanceRequestStatus(request.id, 'accepted')}>Accept request</button>
+                          )}
+                          <button type="button" className="btn btn-secondary" onClick={() => handleAmbulanceRequestStatus(request.id, 'completed')}>Complete</button>
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="ambulance-details-empty">Patient requests for {ambulanceDriver.hospital} will appear here with a live location.</p>
+                )}
+              </section>
             </section>
           )}
           <section className="ambulance-card ambulance-user-panel">
@@ -862,19 +1065,51 @@ function App() {
             </div>
             {sharedAmbulances.length ? (
               <div className="shared-ambulance-list">
-                {sharedAmbulances.map((ambulance) => (
-                  <article className="shared-ambulance" key={ambulance.phone}>
-                    <div className="shared-ambulance-icon">+</div>
-                    <div>
-                      <strong>{ambulance.hospital} ambulance</strong>
-                      <p>Driver available · Location shared just now</p>
-                    </div>
-                    <a className="location-link" href={`https://www.google.com/maps?q=${ambulance.latitude},${ambulance.longitude}`} target="_blank" rel="noopener noreferrer">Open map ↗</a>
-                  </article>
-                ))}
+                {sharedAmbulances.map((ambulance) => {
+                  const patientRequest = ambulanceRequests.find((request) => request.ambulancePhone === ambulance.phone && request.status !== 'completed')
+                  const patientMapUrl = patientRequest
+                    ? `https://www.google.com/maps?q=${patientRequest.latitude},${patientRequest.longitude}&output=embed`
+                    : ''
+                  return (
+                    <article className={`shared-ambulance ${patientRequest ? 'shared-ambulance-tracking' : ''}`} key={ambulance.phone}>
+                      {patientRequest ? (
+                        <>
+                          <div className="shared-ambulance-tracking-heading">
+                            <div className="shared-ambulance-icon">+</div>
+                            <div>
+                              <strong>Patient location shared</strong>
+                              <p>{patientRequest.patientName}  Live location updates enabled</p>
+                            </div>
+                            <span className="live-badge"><span /> TRACKING</span>
+                          </div>
+                          <iframe
+                            className="patient-location-map"
+                            src={patientMapUrl}
+                            title={`Live location for ${patientRequest.patientName}`}
+                            loading="lazy"
+                            referrerPolicy="strict-origin-when-cross-origin"
+                          />
+                          <div className="shared-ambulance-location-footer">
+                            <span>{patientRequest.latitude.toFixed(5)}, {patientRequest.longitude.toFixed(5)}</span>
+                            <a className="location-link" href={`https://www.google.com/maps/dir/?api=1&destination=${patientRequest.latitude},${patientRequest.longitude}`} target="_blank" rel="noopener noreferrer">Navigate to patient </a>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <div className="shared-ambulance-icon">+</div>
+                          <div>
+                            <strong>{ambulance.hospital} ambulance</strong>
+                            <p>Driver available  Location shared just now</p>
+                          </div>
+                          <a className="location-link" href={`https://www.google.com/maps?q=${ambulance.latitude},${ambulance.longitude}`} target="_blank" rel="noopener noreferrer">Open map </a>
+                        </>
+                      )}
+                    </article>
+                  )
+                })}
               </div>
             ) : (
-              <div className="ambulance-empty-state"><span aria-hidden="true">⌖</span><p>No ambulance locations are being shared right now.</p></div>
+              <div className="ambulance-empty-state"><span aria-hidden="true"></span><p>No ambulance locations are being shared right now.</p></div>
             )}
           </section>
         </main>
@@ -885,14 +1120,14 @@ function App() {
             <h1>Admin sign in</h1>
             <p className="admin-description">Sign in to review confirmed patient appointments.</p>
             <form onSubmit={handleAdminLogin}>
-              <label htmlFor="adminEmail">Admin email</label>
-              <input id="adminEmail" type="email" autoComplete="username" required value={adminEmail} onChange={(event) => setAdminEmail(event.target.value)} />
+              <label htmlFor="adminEmail">Hospital admin username</label>
+              <input id="adminEmail" type="text" autoComplete="username" placeholder="Enter the exact hospital name" required value={adminEmail} onChange={(event) => setAdminEmail(event.target.value)} />
               <label htmlFor="adminPassword">Password</label>
               <input id="adminPassword" type="password" autoComplete="current-password" required value={adminPassword} onChange={(event) => setAdminPassword(event.target.value)} />
               {adminLoginError && <p className="admin-login-error" role="alert">{adminLoginError}</p>}
               <button type="submit" className="btn btn-primary">Sign in to admin</button>
             </form>
-            <p className="admin-demo-note">Demo credentials: admin@mediconnect.com / Admin@123</p>
+            <p className="admin-demo-note">Username: exact hospital name (for example, PSG Hospitals)<br />Password: Admin@123</p>
           </section>
         </main>
       ) : currentPage === 'admin-dashboard' && adminUser ? (
@@ -900,8 +1135,8 @@ function App() {
           <div className="admin-heading">
             <div>
               <p className="booking-kicker">MediConnect administration</p>
-              <h1>Booked appointments</h1>
-              <p className="admin-description">Patient and visit details for confirmed bookings.</p>
+              <h1>{adminHospital} appointments</h1>
+              <p className="admin-description">Patient and visit details for confirmed bookings at this hospital.</p>
             </div>
             <div className="admin-total"><strong>{appointments.length}</strong><span>Total bookings</span></div>
           </div>
@@ -912,7 +1147,7 @@ function App() {
                 <tbody>
                   {[...appointments].sort((a, b) => `${a.date} ${a.time}`.localeCompare(`${b.date} ${b.time}`)).map((appointment) => (
                     <tr key={appointment.id}>
-                      <td><strong>{appointment.patientName}</strong><span>{appointment.patientAge} years · For {appointment.patientType}</span></td>
+                      <td><strong>{appointment.patientName}</strong><span>{appointment.patientAge} years  For {appointment.patientType}</span></td>
                       <td>{appointment.patientEmail || 'Not provided'}</td>
                       <td><strong>{appointment.doctorName}</strong><span>{appointment.hospital}</span></td>
                       <td><strong>{appointment.date}</strong><span>{appointment.time}</span></td>
@@ -936,24 +1171,24 @@ function App() {
                 <h1>Better care starts with a <em>simpler visit.</em></h1>
                 <p className="landing-lede">Find trusted specialists, choose a convenient OPD slot, and reserve your token before you arrive.</p>
                 <div className="landing-actions">
-                  <button type="button" className="landing-cta" onClick={() => setCurrentPage('booking')}>Book an appointment <span aria-hidden="true">↗</span></button>
-                  <a className="landing-secondary" href="#services">Explore the experience <span aria-hidden="true">↓</span></a>
+                  <button type="button" className="landing-cta" onClick={() => setCurrentPage('booking')}>Book an appointment <span aria-hidden="true"></span></button>
+                  <a className="landing-secondary" href="#services">Explore the experience <span aria-hidden="true"></span></a>
                 </div>
                 <div className="landing-proof">
                   <div className="proof-avatars" aria-hidden="true"><span>PN</span><span>RM</span><span>SK</span></div>
-                  <p><strong>Trusted by patients across Coimbatore</strong><br /><span>Real specialists · Live OPD availability</span></p>
+                  <p><strong>Trusted by patients across Coimbatore</strong><br /><span>Real specialists  Live OPD availability</span></p>
                 </div>
               </div>
               <div className="landing-art" aria-label="MediConnect appointment illustration">
                 <div className="art-glow" />
-                <div className="art-card art-card-top"><span className="art-icon">✓</span><div><strong>Appointment confirmed</strong><small>Today, 10:00 AM</small></div></div>
+                <div className="art-card art-card-top"><span className="art-icon"></span><div><strong>Appointment confirmed</strong><small>Today, 10:00 AM</small></div></div>
                 <div className="art-card art-card-bottom"><span className="pulse-dot" /><div><strong>Live token updates</strong><small>Know before you go</small></div></div>
               </div>
             </section>
 
             <section className="service-strip" id="services" aria-label="Locate hospitals">
               <button type="button" className="hospital-locator-button" onClick={() => setCurrentPage('hospitals')}>
-                Locate hospitals <span aria-hidden="true">↗</span>
+                Locate hospitals <span aria-hidden="true"></span>
               </button>
             </section>
           </main>
@@ -967,26 +1202,26 @@ function App() {
             <p>Select a specialty and doctor to see the next available visit.</p>
           </div>
           <div className="location-bar">
-            📍 <span id="locationText">Coimbatore, Tamil Nadu</span>
+             <span id="locationText">Coimbatore, Tamil Nadu</span>
           </div>
         </div>
 
         <div className="queue-ticker">
           <div>
-            <span className="queue-live-tag">● Live OPD</span>
+            <span className="queue-live-tag"> Live OPD</span>
             <span>Coimbatore OPD Central: <strong style={{ color: '#38bdf8' }}>Token #4</strong> in Consultation</span>
           </div>
-          <div style={{ color: '#94a3b8', fontSize: '11px' }}>⏱ Avg Consultation: ~6 mins</div>
+          <div style={{ color: '#94a3b8', fontSize: '11px' }}> Avg Consultation: ~6 mins</div>
         </div>
 
         <div className="booking-layout">
           <div className="booking-form-column">
             <div className="symptom-section">
-              <div className="section-title">⚡ Quick Symptom Matcher (Click to auto-select)</div>
+              <div className="section-title"> Quick Symptom Matcher (Click to auto-select)</div>
               <div className="chip-grid">
-                <div className="s-chip" onClick={() => handleSymptomMatch('ENT')}>👂 Ear / Throat Pain</div>
-                <div className="s-chip" onClick={() => handleSymptomMatch('CARDIOLOGY')}>❤️ Chest Pain / High BP</div>
-                <div className="s-chip" onClick={() => handleSymptomMatch('NEUROSURGERY')}>🧠 Headache / Spine Pain</div>
+                <div className="s-chip" onClick={() => handleSymptomMatch('ENT')}> Ear / Throat Pain</div>
+                <div className="s-chip" onClick={() => handleSymptomMatch('CARDIOLOGY')}> Chest Pain / High BP</div>
+                <div className="s-chip" onClick={() => handleSymptomMatch('NEUROSURGERY')}> Headache / Spine Pain</div>
               </div>
             </div>
             <main className="card">
@@ -1029,35 +1264,41 @@ function App() {
             />
           </div>
 
-          <div className="step-title">2. Medical Specialty</div>
-          <select value={specialty} onChange={(e) => { setSpecialty(e.target.value); setDoctorId(''); setDate(''); setTime(''); setSeat(null); setShowPayment(false); setUtr(''); setPaymentVerified(false); }}>
+          <div className="step-title">2. Hospital / Branch</div>
+          <select value={hospitalName} onChange={handleHospitalChange} aria-label="Select hospital branch">
+            <option value="">-- Choose Hospital Branch --</option>
+            {hospitalBranches.map((hospital) => (
+              <option key={hospital.name} value={hospital.name}>{hospital.name}  {hospital.location}</option>
+            ))}
+          </select>
+
+          <div className="step-title">3. Medical Specialty</div>
+          <select value={specialty} disabled={!hospitalName} onChange={(e) => { setSpecialty(e.target.value); setDoctorId(''); setDate(''); setTime(''); setSeat(null); setShowPayment(false); setUtr(''); setPaymentVerified(false); }}>
             <option value="">-- Choose Medical Specialty --</option>
             <option value="ENT">ENT (Ear, Nose &amp; Throat)</option>
             <option value="CARDIOLOGY">Cardiology &amp; Heart Care</option>
             <option value="NEUROSURGERY">Neurosurgery &amp; Spine</option>
           </select>
 
-          <div className="step-title">3. Specialist Doctor</div>
-          <select value={doctorId} onChange={handleDoctorSelect} disabled={!specialty}>
+          <div className="step-title">4. Specialist Doctor</div>
+          <select value={doctorId} onChange={handleDoctorSelect} disabled={!specialty || !hospitalName}>
             {!specialty ? (
               <option value="">Select specialty first</option>
             ) : (
               <>
-                <option value="">Select a Specialist</option>
-                {doctorList.map((doc) => (
-                  <option key={doc.id} value={doc.id}>{doc.name} ({doc.hospital.name})</option>
-                ))}
+                <option value="">{doctorList.length ? 'Select a Specialist' : 'No doctor available at this branch'}</option>
+                {doctorList.map((doc) => <option key={doc.id} value={doc.id}>{doc.name} ({doc.hospital.name})</option>)}
               </>
             )}
           </select>
           {selectedDoctor && (
             <div className="doctor-details-box" style={{ display: 'block' }}>
-              <div>🏥 <strong>{selectedDoctor.hospital.name}</strong> · {selectedDoctor.hospital.location}</div>
-              <div>🕒 <strong>OPD Timings:</strong> {selectedDoctor.schedule}</div>
+              <div> <strong>{selectedDoctor.hospital.name}</strong>  {selectedDoctor.hospital.location}</div>
+              <div> <strong>OPD Timings:</strong> {selectedDoctor.schedule}</div>
             </div>
           )}
 
-          <div className="step-title">4. Consultation Date</div>
+          <div className="step-title">5. Consultation Date</div>
           <input
             type="date"
             id="dateInput"
@@ -1067,7 +1308,7 @@ function App() {
           />
           {dayOfWeek === 0 && (
             <div id="sundayNotice" style={{ display: 'block', color: 'var(--danger)', fontSize: '12px', fontWeight: 700, marginTop: '6px' }}>
-              ⚠️ Outpatient clinics are closed on Sundays. Emergency OPD is open 24/7.
+               Outpatient clinics are closed on Sundays. Emergency OPD is open 24/7.
             </div>
           )}
 
@@ -1087,7 +1328,7 @@ function App() {
                     >
                       {expired ? (
                         <>
-                          ⏱ {slotValue}
+                           {slotValue}
                           <br />
                           <small>Closed</small>
                         </>
@@ -1104,7 +1345,7 @@ function App() {
           {time && (
             <div id="seatArea" style={{ display: 'block' }}>
               <div className="seat-header">
-                <span>🪑 6. Token / Seat Assignment</span>
+                <span> 6. Token / Seat Assignment</span>
                 <span id="seatCountBadge" style={{ color: 'var(--primary)' }}>{availableSeatCount} Available</span>
               </div>
               <div id="seatGrid" className="seat-grid">
@@ -1130,7 +1371,7 @@ function App() {
                 <div className="legend-item"><div className="legend-dot" style={{ background: 'var(--booked)' }}></div> Booked</div>
               </div>
               <button id="payStepBtn" className="btn btn-primary" style={{ marginTop: '14px' }} onClick={handleShowPayment} disabled={seat === null}>
-                Proceed to Token Payment →
+                Proceed to Token Payment
               </button>
             </div>
           )}
@@ -1141,7 +1382,7 @@ function App() {
                 <div className="summary-item"><strong>Patient Profile</strong>{patientName || patientType} ({patientAge} Yrs)</div>
                 <div className="summary-item"><strong>Doctor</strong>{selectedDoctor.name}</div>
                 <div className="summary-item"><strong>Hospital</strong>{selectedDoctor.hospital.name}</div>
-                <div className="summary-item"><strong>Date &amp; Slot</strong>{date} · {time}</div>
+                <div className="summary-item"><strong>Date &amp; Slot</strong>{date}  {time}</div>
                 <div className="summary-item"><strong>Token Assigned</strong>Token #{seat}</div>
                 <div className="summary-item"><strong>OPD Status</strong>On Schedule</div>
               </div>
@@ -1159,7 +1400,7 @@ function App() {
 
               {paymentMethod === 'online' && (
                 <>
-                  <div className="gpay-badge">💳 Google Pay / PhonePe UPI</div>
+                  <div className="gpay-badge"> Google Pay / PhonePe UPI</div>
                   <div id="qrContainer">
                     <img src={qrImage} alt="UPI QR" style={{ borderRadius: '8px', width: '160px', height: '160px' }} />
                   </div>
@@ -1201,15 +1442,55 @@ function App() {
         </div>
         )}
 
-      <div id="authModal" className="modal-overlay" style={{ display: isAuthOpen ? 'grid' : 'none' }}>
+      <div id="authModal" className="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="authTitle" style={{ display: isAuthOpen ? 'grid' : 'none' }}>
         <div className="modal-card">
-          <button className="modal-close" type="button" onClick={() => setIsAuthOpen(false)}>✕</button>
-          <h3 style={{ marginBottom: '14px', fontSize: '16px', color: 'var(--navy)' }}>Patient Sign In</h3>
+          <button className="modal-close" type="button" aria-label="Close sign in" onClick={() => setIsAuthOpen(false)}></button>
+          <p className="modal-kicker">MediConnect account</p>
+          <h3 id="authTitle">Patient Sign In</h3>
+          <p className="modal-copy">Sign in to keep your appointments and patient details together.</p>
           <form onSubmit={handleLogin}>
-            <div style={{ marginBottom: '10px', textAlign: 'left' }}>
-              <label style={{ fontSize: '11px', fontWeight: 700, color: 'var(--muted)' }}>Email / Mobile</label>
-              <input type="text" id="loginId" placeholder="name@domain.com" required value={loginInput} onChange={(e) => setLoginInput(e.target.value)} />
+            <div className="auth-field">
+              <div className="auth-field">
+                <label htmlFor="patientName">Full Name</label>
+                <input type="text" id="patientName" placeholder="Enter patient name" required value={patientName} onChange={(e) => setPatientName(e.target.value)} />
+              </div>
+              <div className="auth-field">
+                <label htmlFor="patientAge">Age</label>
+                <input type="number" id="patientAge" min="1" max="120" required value={patientAge} onChange={(e) => setPatientAge(e.target.value)} />
+              </div>
+              <div className="auth-field">
+                <label htmlFor="patientGender">Gender</label>
+                <select id="patientGender" required value={patientGender} onChange={(e) => setPatientGender(e.target.value)}>
+                  <option value="">Select gender</option>
+                  <option value="Female">Female</option>
+                  <option value="Male">Male</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+              <div className="auth-field">
+                <label htmlFor="patientAddress">Address</label>
+                <textarea id="patientAddress" placeholder="Enter your address" required value={patientAddress} onChange={(e) => setPatientAddress(e.target.value)} />
+              </div>
+              <div className="auth-field">
+                <label htmlFor="profilePhoto">Profile Photo (Optional, max 1 MB)</label>
+                <input type="file" id="profilePhoto" accept="image/*" onChange={(e) => {
+                  const file = e.target.files?.[0]
+                  if (!file) return
+                  if (file.size > 1024 * 1024) { setLoginError('Photo must be smaller than 1 MB.'); e.target.value = ''; return }
+                  const reader = new FileReader()
+                  reader.onload = () => setProfilePhoto(reader.result)
+                  reader.readAsDataURL(file)
+                  setLoginError('')
+                }} />
+              </div>
+              <label htmlFor="loginId">Email or mobile</label>
+              <input type="text" id="loginId" placeholder="name@domain.com" autoComplete="username" required value={loginInput} onChange={(e) => { setLoginInput(e.target.value); setLoginError('') }} />
             </div>
+            <div className="auth-field">
+              <label htmlFor="loginPassword">Password</label>
+              <input type="password" id="loginPassword" placeholder="At least 6 characters" autoComplete="current-password" required value={loginPassword} onChange={(e) => { setLoginPassword(e.target.value); setLoginError('') }} />
+            </div>
+            {loginError && <p className="auth-error" role="alert">{loginError}</p>}
             <button type="submit" className="btn btn-primary">Login Now</button>
           </form>
         </div>
